@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- VoixPalette.darkBg — keeps the OS launch window the same colour as the
+         splash screen, so there is no white flash before the orb ignites. -->
+    <color name="voix_launch_bg">#04060F</color>
+</resources>
