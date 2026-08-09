@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
 import 'data/repositories/local_store.dart';
 import 'providers/app_providers.dart';
+import 'providers/user_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,9 +32,22 @@ Future<void> main() async {
     SystemUiMode.edgeToEdge,
   );
 
+  final container = ProviderContainer(
+    overrides: [localStoreProvider.overrideWithValue(store)],
+  );
+
+  // Reminders are re-synced at every launch rather than only when a switch is
+  // touched: the schedule lives in the OS, and an uninstall/reinstall, a
+  // "clear data", or a reboot on some vendors' Android builds all wipe it
+  // while the learner's preference here still says reminders are on.
+  final user = container.read(userControllerProvider);
+  if (user != null) {
+    unawaited(container.read(notificationServiceProvider).sync(user));
+  }
+
   runApp(
-    ProviderScope(
-      overrides: [localStoreProvider.overrideWithValue(store)],
+    UncontrolledProviderScope(
+      container: container,
       child: const VoixApp(),
     ),
   );

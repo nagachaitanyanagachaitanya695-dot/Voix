@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/repositories/auth_repository.dart';
 import '../data/repositories/local_store.dart';
 import '../data/services/ai_tutor_service.dart';
+import '../data/services/notification_service.dart';
 import '../data/services/speech_service.dart';
 
 /// Injected in `main()` once [LocalStore.open] resolves, so the rest of the
@@ -24,6 +25,12 @@ final authRepositoryProvider = Provider<AuthRepository>(
 /// Likewise: point this at a hosted LLM client to upgrade the tutor.
 final aiTutorProvider = Provider<AiTutorService>(
   (ref) => LocalAiTutorService(),
+);
+
+/// Schedules the daily reminders. Kept alive for the process lifetime so the
+/// timezone database and the notification channel are only set up once.
+final notificationServiceProvider = Provider<NotificationService>(
+  (ref) => NotificationService(),
 );
 
 final speechServiceProvider = Provider<SpeechService>((ref) {

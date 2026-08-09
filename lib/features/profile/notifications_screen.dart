@@ -6,15 +6,17 @@ import '../../core/theme/app_dimens.dart';
 import '../../core/utils/context_ext.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/staggered.dart';
+import '../../data/models/user_profile.dart';
+import '../../data/services/notification_service.dart';
+import '../../providers/app_providers.dart';
 import '../../providers/user_controller.dart';
 import 'settings_screen.dart';
 import 'widgets/settings_tile.dart';
 
 /// Reminder and streak notification preferences.
 ///
-/// Preferences persist immediately; actually scheduling the local
-/// notifications requires a platform plugin (see `docs/BACKEND.md`) — the
-/// toggles below are the source of truth that scheduling will read from.
+/// Each switch rewrites the real schedule through `NotificationService`, so
+/// what is shown here is what Android will actually deliver.
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
 
@@ -24,10 +26,21 @@ class NotificationsScreen extends ConsumerWidget {
     if (user == null) return const SizedBox.shrink();
 
     final controller = ref.read(userControllerProvider.notifier);
+    final notifications = ref.read(notificationServiceProvider);
     final time = TimeOfDay(
       hour: user.reminderHour,
       minute: user.reminderMinute,
     );
+
+    // Switching a reminder *on* is the one moment where asking for the OS
+    // notification permission is expected, so only that direction prompts.
+    void toggle(bool value, UserProfile Function(UserProfile, bool) edit) {
+      Haptic.tap();
+      controller.setReminderPreference(
+        (u) => edit(u, value),
+        prompting: value,
+      );
+    }
 
     return SettingsBody(
       title: 'Notifications',
@@ -49,42 +62,36 @@ class NotificationsScreen extends ConsumerWidget {
               SettingsTile(
                 icon: Icons.notifications_none_rounded,
                 title: 'Practice Reminders',
-                subtitle: 'Remind me to practise daily',
+                subtitle: 'A nudge at your chosen time each day',
                 showChevron: false,
                 trailing: Switch(
                   value: user.remindersEnabled,
-                  onChanged: (v) {
-                    Haptic.tap();
-                    controller.update((u) => u.copyWith(remindersEnabled: v));
-                  },
+                  onChanged: (v) =>
+                      toggle(v, (u, on) => u.copyWith(remindersEnabled: on)),
                 ),
               ),
               SettingsTile(
                 icon: Icons.track_changes_rounded,
                 title: 'Daily Goal Updates',
-                subtitle: 'Notify me about my daily goal',
+                subtitle: 'An afternoon check-in on your minutes',
                 iconColor: VoixPalette.violet,
                 showChevron: false,
                 trailing: Switch(
-                  value: user.remindersEnabled,
-                  onChanged: (v) {
-                    Haptic.tap();
-                    controller.update((u) => u.copyWith(remindersEnabled: v));
-                  },
+                  value: user.goalUpdatesEnabled,
+                  onChanged: (v) =>
+                      toggle(v, (u, on) => u.copyWith(goalUpdatesEnabled: on)),
                 ),
               ),
               SettingsTile(
                 icon: Icons.local_fire_department_rounded,
                 title: 'Streak Alerts',
-                subtitle: 'Remind me to keep my streak',
+                subtitle: 'An evening warning before a streak lapses',
                 iconColor: VoixPalette.streak,
                 showChevron: false,
                 trailing: Switch(
-                  value: user.remindersEnabled,
-                  onChanged: (v) {
-                    Haptic.tap();
-                    controller.update((u) => u.copyWith(remindersEnabled: v));
-                  },
+                  value: user.streakAlertsEnabled,
+                  onChanged: (v) =>
+                      toggle(v, (u, on) => u.copyWith(streakAlertsEnabled: on)),
                 ),
               ),
             ],
@@ -123,8 +130,19 @@ class NotificationsScreen extends ConsumerWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: Gap.xs),
           child: Text(
-            'Reminders are stored on this device. Delivery requires the local '
-            'notification plugin described in docs/BACKEND.md.',
+            switch (notifications.blocker) {
+              ReminderBlocker.permissionDenied =>
+                'Notifications are switched off for Voix in your Android '
+                    'settings, so these reminders cannot be delivered. Turn '
+                    'them on under Settings › Apps › Voix › Notifications.',
+              ReminderBlocker.unavailable =>
+                'Reminders could not be scheduled on this device.',
+              ReminderBlocker.none =>
+                'Reminders are scheduled on this device — no account or '
+                    'internet connection needed. Android may deliver them a '
+                    'few minutes either side of the time shown so it can '
+                    'batch them and save battery.',
+            },
             style: context.text.labelSmall?.copyWith(height: 1.45),
           ),
         ),

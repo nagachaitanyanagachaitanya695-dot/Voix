@@ -90,6 +90,8 @@ class UserProfile {
     this.reminderHour = 19,
     this.reminderMinute = 0,
     this.remindersEnabled = true,
+    this.goalUpdatesEnabled = true,
+    this.streakAlertsEnabled = true,
     this.soundEnabled = true,
     this.hapticsEnabled = true,
   });
@@ -127,7 +129,16 @@ class UserProfile {
 
   final int reminderHour;
   final int reminderMinute;
+
+  /// The daily practice nudge, delivered at [reminderHour]:[reminderMinute].
   final bool remindersEnabled;
+
+  /// An afternoon check-in on the daily-minutes goal.
+  final bool goalUpdatesEnabled;
+
+  /// A late-evening warning when a streak is about to lapse.
+  final bool streakAlertsEnabled;
+
   final bool soundEnabled;
   final bool hapticsEnabled;
 
@@ -216,6 +227,8 @@ class UserProfile {
     int? reminderHour,
     int? reminderMinute,
     bool? remindersEnabled,
+    bool? goalUpdatesEnabled,
+    bool? streakAlertsEnabled,
     bool? soundEnabled,
     bool? hapticsEnabled,
   }) {
@@ -248,6 +261,8 @@ class UserProfile {
       reminderHour: reminderHour ?? this.reminderHour,
       reminderMinute: reminderMinute ?? this.reminderMinute,
       remindersEnabled: remindersEnabled ?? this.remindersEnabled,
+      goalUpdatesEnabled: goalUpdatesEnabled ?? this.goalUpdatesEnabled,
+      streakAlertsEnabled: streakAlertsEnabled ?? this.streakAlertsEnabled,
       soundEnabled: soundEnabled ?? this.soundEnabled,
       hapticsEnabled: hapticsEnabled ?? this.hapticsEnabled,
     );
@@ -281,6 +296,8 @@ class UserProfile {
         'reminderHour': reminderHour,
         'reminderMinute': reminderMinute,
         'remindersEnabled': remindersEnabled,
+        'goalUpdatesEnabled': goalUpdatesEnabled,
+        'streakAlertsEnabled': streakAlertsEnabled,
         'soundEnabled': soundEnabled,
         'hapticsEnabled': hapticsEnabled,
       };
@@ -330,6 +347,8 @@ class UserProfile {
       reminderHour: (j['reminderHour'] as num?)?.toInt() ?? 19,
       reminderMinute: (j['reminderMinute'] as num?)?.toInt() ?? 0,
       remindersEnabled: j['remindersEnabled'] as bool? ?? true,
+      goalUpdatesEnabled: j['goalUpdatesEnabled'] as bool? ?? true,
+      streakAlertsEnabled: j['streakAlertsEnabled'] as bool? ?? true,
       soundEnabled: j['soundEnabled'] as bool? ?? true,
       hapticsEnabled: j['hapticsEnabled'] as bool? ?? true,
     );

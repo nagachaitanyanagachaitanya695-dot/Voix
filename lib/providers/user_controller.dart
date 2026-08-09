@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -85,8 +86,29 @@ class UserController extends Notifier<UserProfile?> {
   }
 
   Future<void> _persist(UserProfile p) async {
+    final before = state;
     state = p;
     await _store.setJson(LocalStore.kProfile, p.toJson());
+
+    // Scheduled notifications carry their text with them — Android composes
+    // them while the app is dead — so any change to what that text says has to
+    // rewrite the schedule. Guarded because _persist also runs on every XP
+    // tick, and rescheduling three alarms on each of those would be waste.
+    if (_affectsReminders(before, p)) {
+      unawaited(ref.read(notificationServiceProvider).sync(p));
+    }
+  }
+
+  static bool _affectsReminders(UserProfile? a, UserProfile b) {
+    if (a == null) return true;
+    return a.remindersEnabled != b.remindersEnabled ||
+        a.goalUpdatesEnabled != b.goalUpdatesEnabled ||
+        a.streakAlertsEnabled != b.streakAlertsEnabled ||
+        a.reminderHour != b.reminderHour ||
+        a.reminderMinute != b.reminderMinute ||
+        a.dailyGoalMinutes != b.dailyGoalMinutes ||
+        a.currentStreak != b.currentStreak ||
+        a.name != b.name;
   }
 
   // ── Session lifecycle ──────────────────────────────────────────────────
@@ -97,6 +119,23 @@ class UserController extends Notifier<UserProfile?> {
     final current = state;
     if (current == null) return;
     await _persist(edit(current));
+  }
+
+  /// Turns a reminder switch on or off, prompting for the OS notification
+  /// permission when something is being switched *on*.
+  ///
+  /// Separate from [update] because the permission dialog must only ever
+  /// appear as a direct result of the learner asking for reminders.
+  Future<void> setReminderPreference(
+    UserProfile Function(UserProfile) edit, {
+    required bool prompting,
+  }) async {
+    final current = state;
+    if (current == null) return;
+    final next = edit(current);
+    state = next;
+    await _store.setJson(LocalStore.kProfile, next.toJson());
+    await ref.read(notificationServiceProvider).sync(next, prompt: prompting);
   }
 
   Future<void> signOut() async {

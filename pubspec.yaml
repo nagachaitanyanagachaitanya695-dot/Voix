@@ -18,6 +18,11 @@ dependencies:
   # Voice
   speech_to_text: ^7.0.0
   flutter_tts: ^4.2.0
+  # Daily practice reminders. Pinned to the versions that resolve against
+  # Flutter 3.35 — newer majors of flutter_local_notifications require 3.38+.
+  flutter_local_notifications: ^20.1.0
+  timezone: ^0.10.1
+  flutter_timezone: ^5.1.0
 
 dev_dependencies:
   flutter_test:
