@@ -132,13 +132,19 @@ class _ProgressScreenState extends ConsumerState<ProgressScreen> {
                                 ),
                               ),
                               const Spacer(),
+                              // Scales down rather than ellipsising: a
+                              // five-figure XP gap must stay readable, and
+                              // "1,000 to Leve…" tells the learner nothing.
                               Flexible(
-                                child: Text(
-                                  '${CountUp.format(user.xpToNextLevel)} to '
-                                  'Level ${user.level + 1}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: context.text.labelSmall,
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    '${CountUp.format(user.xpToNextLevel)} to '
+                                    'Level ${user.level + 1}',
+                                    maxLines: 1,
+                                    style: context.text.labelSmall,
+                                  ),
                                 ),
                               ),
                             ],

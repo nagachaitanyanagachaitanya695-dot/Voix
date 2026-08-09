@@ -48,3 +48,7 @@ app.*.map.json
 android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
 lib/firebase_options.dart
+
+# Screenshots are regenerated on demand:
+#   flutter test test/render_screens.dart --update-goldens --tags render
+# They are committed so the UI can be reviewed without a device.
