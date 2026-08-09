@@ -134,6 +134,15 @@ void main() {
       );
     });
 
+    test('splits adverbial "everyday" but keeps the adjective', () {
+      // The exact sentence from the reference design.
+      final result = GrammarEngine.analyse('He go to school everyday.');
+      expect(result.first.corrected, 'He goes to school every day.');
+      // Adjective use is correct and must survive untouched.
+      expect(GrammarEngine.analyse('I want to learn everyday English'), isEmpty);
+      expect(GrammarEngine.analyse('This is everyday life.'), isEmpty);
+    });
+
     test('flags "a doubt" but not the verb "doubt"', () {
       expect(
         GrammarEngine.analyse('I have a doubt').first.corrected,

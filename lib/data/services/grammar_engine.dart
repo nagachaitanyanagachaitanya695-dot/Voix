@@ -224,12 +224,18 @@ abstract final class GrammarEngine {
     ),
 
     // ── Adverb form ──────────────────────────────────────────────────────
+    // "Everyday" is an adjective and must precede a noun ("everyday English").
+    // The adverb is two words. Flagged only when no noun follows — clause end,
+    // or a preposition/conjunction — so "everyday English" is left alone.
     _Rule(
-      RegExp(r'\b(go|goes|went|come|comes|study|studies|work|works|'
-          r'practise|practice)\s+everyday\b', caseSensitive: false),
-      '"Everyday" (one word) is an adjective. For "each day", use two words: '
-      'every day.',
-      replace: (m) => '${m[1]} every day',
+      RegExp(
+        r'\beveryday\b(?=\s*(?:[.!?,;]|$|at\b|in\b|on\b|after\b|before\b|'
+        r'with\b|and\b|but\b|so\b|because\b))',
+        caseSensitive: false,
+      ),
+      '"Everyday" (one word) is an adjective, as in "everyday English". '
+      'When you mean "each day", write two words: every day.',
+      replace: (m) => 'every day',
     ),
 
     // ── Double negative ──────────────────────────────────────────────────
