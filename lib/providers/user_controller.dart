@@ -90,6 +90,10 @@ class UserController extends Notifier<UserProfile?> {
     state = p;
     await _store.setJson(LocalStore.kProfile, p.toJson());
 
+    // Back the profile up off-device. Debounced inside the sync, and a no-op
+    // when Firebase is not configured.
+    ref.read(profileSyncProvider).push(p);
+
     // Scheduled notifications carry their text with them — Android composes
     // them while the app is dead — so any change to what that text says has to
     // rewrite the schedule. Guarded because _persist also runs on every XP

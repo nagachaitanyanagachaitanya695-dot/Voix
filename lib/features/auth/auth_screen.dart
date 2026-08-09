@@ -73,6 +73,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             email: _email.text.trim(),
             password: _password.text,
             name: draft.name,
+            isSignUp: _isSignUp,
           );
 
       // A brand-new profile takes the onboarding answers; an existing one
@@ -98,6 +99,28 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       _showError('Something went wrong. Please try again.');
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _resetPassword() async {
+    final address = _email.text.trim();
+    if (address.isEmpty) {
+      Haptic.error();
+      _showError('Enter your email address first, then tap Forgot password.');
+      return;
+    }
+
+    try {
+      await ref.read(authRepositoryProvider).sendPasswordReset(address);
+      if (!mounted) return;
+      Haptic.success();
+      // Deliberately does not confirm whether an account exists: saying "no
+      // such user" would let anyone test which email addresses are registered.
+      _showError('If $address has an account, a reset link is on its way.');
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      Haptic.error();
+      _showError(e.message);
     }
   }
 
@@ -260,10 +283,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         child: Align(
                           alignment: Alignment.centerRight,
                           child: Pressable(
-                            onTap: () => _showError(
-                              'Password reset needs an email backend — '
-                              'see docs/FIREBASE_SETUP.md.',
-                            ),
+                            onTap: _resetPassword,
                             scale: 0.94,
                             child: Padding(
                               padding: const EdgeInsets.all(Gap.xxs),

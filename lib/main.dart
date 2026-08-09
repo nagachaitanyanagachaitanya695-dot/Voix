@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'data/repositories/local_store.dart';
+import 'firebase_options.dart';
 import 'providers/app_providers.dart';
 import 'providers/user_controller.dart';
 
@@ -32,8 +34,27 @@ Future<void> main() async {
     SystemUiMode.edgeToEdge,
   );
 
+  // Firebase is optional. An unconfigured project, a missing network at first
+  // launch, or a botched google-services setup must all end the same way: the
+  // app starts on local accounts rather than showing a crash screen to someone
+  // who only wanted to practise their English.
+  var firebaseReady = false;
+  if (DefaultFirebaseOptions.isConfigured) {
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      firebaseReady = true;
+    } catch (e) {
+      debugPrint('Firebase initialisation failed ($e) — using local accounts');
+    }
+  }
+
   final container = ProviderContainer(
-    overrides: [localStoreProvider.overrideWithValue(store)],
+    overrides: [
+      localStoreProvider.overrideWithValue(store),
+      firebaseReadyProvider.overrideWithValue(firebaseReady),
+    ],
   );
 
   // Reminders are re-synced at every launch rather than only when a switch is

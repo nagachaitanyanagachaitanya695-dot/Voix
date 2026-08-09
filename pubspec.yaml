@@ -18,6 +18,11 @@ dependencies:
   # Voice
   speech_to_text: ^7.0.0
   flutter_tts: ^4.2.0
+  # Accounts and cloud sync. Optional at runtime — see lib/firebase_options.dart.
+  firebase_core: ^4.13.0
+  firebase_auth: ^6.5.7
+  cloud_firestore: ^6.8.0
+  google_sign_in: ^7.2.0
   # Daily practice reminders. Pinned to the versions that resolve against
   # Flutter 3.35 — newer majors of flutter_local_notifications require 3.38+.
   flutter_local_notifications: ^20.1.0

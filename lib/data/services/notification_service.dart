@@ -46,7 +46,16 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _plugin;
 
   bool _ready = false;
+  bool _initFailed = false;
   ReminderBlocker _blocker = ReminderBlocker.none;
+
+  /// Ceiling on any single platform call that is not waiting for the learner.
+  ///
+  /// Setting up notifications happens on the path of a settings toggle and of
+  /// app startup. A plugin that never answers — a broken vendor ROM, a channel
+  /// with no handler — would otherwise hang both forever. Reminders are worth
+  /// waiting a few seconds for; they are not worth a frozen switch.
+  static const _callLimit = Duration(seconds: 5);
 
   /// The most recent reason scheduling was refused. Surfaced in Settings.
   ReminderBlocker get blocker => _blocker;
@@ -70,12 +79,12 @@ class NotificationService {
   /// thrown, because a reminder failing to schedule must never stop the app
   /// from starting.
   Future<void> init() async {
-    if (_ready) return;
+    if (_ready || _initFailed) return;
     try {
       tzdata.initializeTimeZones();
       // The device's own zone, so 7pm means 7pm where the learner is — and
       // keeps meaning that after they fly somewhere else.
-      final info = await FlutterTimezone.getLocalTimezone();
+      final info = await FlutterTimezone.getLocalTimezone().timeout(_callLimit);
       tz.setLocalLocation(tz.getLocation(info.identifier));
     } catch (e) {
       // tz.local defaults to UTC, which is wrong but survivable — better than
@@ -84,18 +93,25 @@ class NotificationService {
     }
 
     try {
-      await _plugin.initialize(
-        settings: const InitializationSettings(
-          // Uses the launcher icon; Android tints it into a white silhouette.
-          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-        ),
-      );
-      await _android?.createNotificationChannel(_channel);
+      await _plugin
+          .initialize(
+            settings: const InitializationSettings(
+              // Uses the launcher icon; Android tints it to a white silhouette.
+              android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+            ),
+          )
+          .timeout(_callLimit);
+      await _android?.createNotificationChannel(_channel).timeout(_callLimit);
       _ready = true;
       _blocker = ReminderBlocker.none;
     } catch (e) {
       debugPrint('NotificationService: initialize failed ($e)');
       _blocker = ReminderBlocker.unavailable;
+      // Remembered for the rest of the process. A plugin that cannot be
+      // initialised will not start working later in the same run, and retrying
+      // would put the timeout above in front of every settings tap. A relaunch
+      // gets a clean attempt.
+      _initFailed = true;
     }
   }
 
@@ -108,6 +124,9 @@ class NotificationService {
     await init();
     if (!_ready) return false;
     try {
+      // No limit here: this one legitimately blocks on the learner tapping
+      // "Allow", and cutting that off after a few seconds would report a
+      // denial they never made.
       final granted = await _android?.requestNotificationsPermission() ?? true;
       _blocker = granted ? ReminderBlocker.none : ReminderBlocker.permissionDenied;
       return granted;
@@ -179,9 +198,9 @@ class NotificationService {
   Future<void> cancelAll() async {
     if (!_ready) return;
     try {
-      await _plugin.cancel(id: _idPractice);
-      await _plugin.cancel(id: _idGoal);
-      await _plugin.cancel(id: _idStreak);
+      for (final id in [_idPractice, _idGoal, _idStreak]) {
+        await _plugin.cancel(id: id).timeout(_callLimit);
+      }
     } catch (e) {
       debugPrint('NotificationService: cancel failed ($e)');
     }
@@ -217,7 +236,7 @@ class NotificationService {
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         // Repeats every day at this wall-clock time.
         matchDateTimeComponents: DateTimeComponents.time,
-      );
+      ).timeout(_callLimit);
     } catch (e) {
       debugPrint('NotificationService: schedule $id failed ($e)');
     }

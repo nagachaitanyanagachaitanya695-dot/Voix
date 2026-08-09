@@ -1,8 +1,12 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/repositories/auth_repository.dart';
+import '../data/repositories/firebase_auth_repository.dart';
 import '../data/repositories/local_store.dart';
+import '../data/repositories/profile_sync.dart';
 import '../data/services/ai_tutor_service.dart';
 import '../data/services/notification_service.dart';
 import '../data/services/speech_service.dart';
@@ -16,11 +20,33 @@ final localStoreProvider = Provider<LocalStore>(
   ),
 );
 
-/// Swap this override to move authentication to Firebase — nothing else in
-/// the app references a concrete implementation.
-final authRepositoryProvider = Provider<AuthRepository>(
-  (ref) => LocalAuthRepository(ref.watch(localStoreProvider)),
-);
+/// Whether `Firebase.initializeApp` succeeded during startup.
+///
+/// Overridden in `main()`. It is false both when the project is unconfigured
+/// (the placeholders in `firebase_options.dart` are still in place) and when
+/// initialisation failed on the device — the app has to behave identically in
+/// either case, which is why this is one flag rather than two.
+final firebaseReadyProvider = Provider<bool>((ref) => false);
+
+/// Real accounts when Firebase is available, device-local accounts when it is
+/// not. Nothing else in the app references a concrete implementation.
+final authRepositoryProvider = Provider<AuthRepository>((ref) {
+  final store = ref.watch(localStoreProvider);
+  if (!ref.watch(firebaseReadyProvider)) return LocalAuthRepository(store);
+  return FirebaseAuthRepository(
+    auth: FirebaseAuth.instance,
+    store: store,
+    sync: ref.watch(profileSyncProvider),
+  );
+});
+
+/// Backs the profile up to Firestore, or does nothing when Firebase is off.
+final profileSyncProvider = Provider<ProfileSync>((ref) {
+  if (!ref.watch(firebaseReadyProvider)) return const NoOpProfileSync();
+  final sync = FirestoreProfileSync(FirebaseFirestore.instance);
+  ref.onDispose(sync.dispose);
+  return sync;
+});
 
 /// Likewise: point this at a hosted LLM client to upgrade the tutor.
 final aiTutorProvider = Provider<AiTutorService>(

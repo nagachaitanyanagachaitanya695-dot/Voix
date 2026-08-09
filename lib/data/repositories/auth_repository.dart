@@ -22,14 +22,23 @@ abstract interface class AuthRepository {
   /// The signed-in user, or null.
   Future<UserProfile?> currentUser();
 
+  /// [isSignUp] distinguishes "create an account" from "log in" for the email
+  /// method. It matters to a real backend — creating an account that already
+  /// exists and logging into one that does not are different errors, and
+  /// guessing which the learner meant produces baffling messages.
   Future<UserProfile> signIn({
     required AuthMethod method,
     String? email,
     String? password,
     String? name,
+    bool isSignUp = false,
   });
 
   Future<void> signOut();
+
+  /// Emails a password-reset link. Throws [AuthException] with something the
+  /// learner can act on when that is not possible.
+  Future<void> sendPasswordReset(String email);
 
   /// Removes the account and every trace of its data.
   Future<void> deleteAccount();
@@ -60,6 +69,7 @@ class LocalAuthRepository implements AuthRepository {
     String? email,
     String? password,
     String? name,
+    bool isSignUp = false,
   }) async {
     // Simulates the round trip so loading states are exercised in development
     // exactly as they will be against a real backend.
@@ -108,6 +118,16 @@ class LocalAuthRepository implements AuthRepository {
   @override
   Future<void> signOut() async {
     await _store.setBool(LocalStore.kSignedIn, false);
+  }
+
+  @override
+  Future<void> sendPasswordReset(String email) async {
+    // There is no server to send from: this account exists only on this phone.
+    throw const AuthException(
+      'Password reset needs an online account. This device is storing your '
+      'progress locally, so there is no password to reset — sign in again '
+      'with any password of 6 characters or more.',
+    );
   }
 
   @override

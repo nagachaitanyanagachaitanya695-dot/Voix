@@ -1,39 +1,99 @@
 # Firebase setup
 
-Voix ships with a working device-local auth implementation so the app runs on a
-fresh clone with no configuration. This document covers replacing it with
-Firebase for real Google / Apple sign-in and cross-device sync.
+The Firebase integration is **written and wired**; it is only switched off,
+because `lib/firebase_options.dart` still holds placeholder values.
 
-The UI never imports a concrete repository, so this is a contained change:
-`AuthRepository` is an interface with **one** wiring point.
+Until you fill those in, the app runs on `LocalAuthRepository`: accounts live on
+the device, Google and Apple sign-in return a "not configured" message, and a
+reinstall loses every streak. Everything else works normally.
+
+Once real values are in, `main()` initialises Firebase, `authRepositoryProvider`
+switches to `FirebaseAuthRepository`, and the profile starts backing up to
+Firestore. **No code changes are needed** — the switch is the config file.
 
 ---
 
-## 1. Add the packages
+## 1. Create the project
+
+1. <https://console.firebase.google.com> → **Add project**.
+2. Inside it, **Authentication → Get started**, and enable:
+   - **Email/Password**
+   - **Google**
+   - **Apple** (only if you are also shipping on iOS)
+   - **Anonymous** — this is what "Continue as Guest" uses. Miss it and the
+     guest button fails with `operation-not-allowed`.
+3. **Firestore Database → Create database**. Start in *production* mode; the
+   rules in section 5 replace the defaults.
+
+## 2. Register the Android app
+
+**Add app → Android**, with package name `com.voix.voix` (it must match
+`applicationId` in `android/app/build.gradle.kts`).
+
+Google Sign-In will not work without your signing certificate's SHA-1
+fingerprint. Add **both** — debug so you can test, release so it works in
+production:
 
 ```bash
-flutter pub add firebase_core firebase_auth cloud_firestore google_sign_in
-flutter pub add sign_in_with_apple   # iOS/macOS only
+# Debug
+keytool -list -v -alias androiddebugkey \
+  -keystore ~/.android/debug.keystore -storepass android -keypass android
+
+# Release — the keystore you made in docs/RELEASE.md
+keytool -list -v -alias voix -keystore ~/voix-upload-key.jks
 ```
 
-## 2. Generate the platform config
+Paste each SHA-1 into Project settings → Your apps → Android → *Add
+fingerprint*.
+
+> If you use Play App Signing (Play re-signs your upload), also add the SHA-1
+> that the Play Console shows under Setup → App signing. Google Sign-In breaks
+> in production without it, and only in production — the single most common way
+> to ship a broken login.
+
+## 3. Fill in `lib/firebase_options.dart`
+
+The easy route generates it for you:
 
 ```bash
 dart pub global activate flutterfire_cli
 flutterfire configure
 ```
 
-This writes `lib/firebase_options.dart` plus
-`android/app/google-services.json` and `ios/Runner/GoogleService-Info.plist`.
+That overwrites `lib/firebase_options.dart` with your real values and drops
+`android/app/google-services.json` in place.
 
-**Do not commit those two files.** Add to `.gitignore`:
+It does **not** write `googleServerClientId`, which this app needs — set it by
+hand. It is the **web** client id, not the Android one: the ID token Firebase
+verifies is issued to the web client. Find it in `google-services.json` as the
+`oauth_client` entry with `"client_type": 3`, or under Project settings →
+General.
 
+```dart
+static const googleServerClientId = '1234567890-abcdef.apps.googleusercontent.com';
 ```
-android/app/google-services.json
-ios/Runner/GoogleService-Info.plist
+
+If you prefer to fill the file in by hand instead of running the CLI, copy
+`apiKey` / `appId` / `messagingSenderId` / `projectId` from the console into the
+`_android` and `_ios` constants. `isConfigured` flips as soon as the Android
+`apiKey` no longer starts with `REPLACE_ME`.
+
+> These values are not secrets — a Firebase `apiKey` identifies a project, it
+> does not authorise anything. Your data is protected by the rules in section 5,
+> which is why they are not optional.
+
+## 4. Gradle
+
+If you ran `flutterfire configure` and have a `google-services.json`, add the
+plugin so it is read at build time. In `android/settings.gradle.kts`:
+
+```kotlin
+plugins {
+    id("com.google.gms.google-services") version "4.4.2" apply false
+}
 ```
 
-Add the Gradle plugin in `android/app/build.gradle.kts`:
+and in `android/app/build.gradle.kts`:
 
 ```kotlin
 plugins {
@@ -41,205 +101,103 @@ plugins {
 }
 ```
 
-…and in `android/settings.gradle.kts`:
+If you filled in `firebase_options.dart` by hand and have no
+`google-services.json`, you can skip this — `Firebase.initializeApp(options:)`
+configures the SDK programmatically. Google Sign-In still works, because
+`serverClientId` is passed in code.
 
-```kotlin
-id("com.google.gms.google-services") version "4.4.2" apply false
+Add the generated config to `.gitignore` either way:
+
+```
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
 ```
 
-Google sign-in needs your signing certificate's SHA-1 registered in the
-Firebase console — debug and release are different certificates, and omitting
-the release one is the usual cause of "sign-in works in debug, fails in
-production".
+## 5. Firestore security rules
 
-## 3. Initialise before `runApp`
-
-In `lib/main.dart`, alongside the existing `LocalStore.open()`:
-
-```dart
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
-
-await Firebase.initializeApp(
-  options: DefaultFirebaseOptions.currentPlatform,
-);
-```
-
-## 4. Implement the repository
-
-Create `lib/data/repositories/firebase_auth_repository.dart`:
-
-```dart
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart' as fb;
-import 'package:google_sign_in/google_sign_in.dart';
-
-import '../models/user_profile.dart';
-import 'auth_repository.dart';
-
-class FirebaseAuthRepository implements AuthRepository {
-  FirebaseAuthRepository({fb.FirebaseAuth? auth, FirebaseFirestore? db})
-      : _auth = auth ?? fb.FirebaseAuth.instance,
-        _db = db ?? FirebaseFirestore.instance;
-
-  final fb.FirebaseAuth _auth;
-  final FirebaseFirestore _db;
-
-  DocumentReference<Map<String, dynamic>> _doc(String uid) =>
-      _db.collection('users').doc(uid);
-
-  @override
-  Future<UserProfile?> currentUser() async {
-    final user = _auth.currentUser;
-    if (user == null) return null;
-    final snap = await _doc(user.uid).get();
-    return snap.exists
-        ? UserProfile.fromJson(snap.data()!)
-        : _seed(user, isGuest: user.isAnonymous);
-  }
-
-  @override
-  Future<UserProfile> signIn({
-    required AuthMethod method,
-    String? email,
-    String? password,
-    String? name,
-  }) async {
-    try {
-      final fb.UserCredential cred = switch (method) {
-        AuthMethod.google => await _google(),
-        AuthMethod.apple => throw const AuthException(
-            'Apple sign-in requires sign_in_with_apple; see step 5.',
-          ),
-        AuthMethod.email => await _emailSignInOrUp(email!, password!),
-        AuthMethod.guest => await _auth.signInAnonymously(),
-      };
-
-      final user = cred.user!;
-      final snap = await _doc(user.uid).get();
-      if (snap.exists) return UserProfile.fromJson(snap.data()!);
-      return _seed(user, name: name, isGuest: method == AuthMethod.guest);
-    } on fb.FirebaseAuthException catch (e) {
-      // Surface something a learner can act on, not a raw error code.
-      throw AuthException(switch (e.code) {
-        'wrong-password' || 'invalid-credential' =>
-          'That email and password do not match.',
-        'email-already-in-use' =>
-          'That email already has an account. Try logging in.',
-        'weak-password' => 'Please choose a longer password.',
-        'network-request-failed' =>
-          'No connection. Check your network and try again.',
-        _ => 'Could not sign you in. Please try again.',
-      });
-    }
-  }
-
-  Future<fb.UserCredential> _google() async {
-    final account = await GoogleSignIn().signIn();
-    if (account == null) throw const AuthException('Sign-in was cancelled.');
-    final auth = await account.authentication;
-    return _auth.signInWithCredential(
-      fb.GoogleAuthProvider.credential(
-        accessToken: auth.accessToken,
-        idToken: auth.idToken,
-      ),
-    );
-  }
-
-  Future<fb.UserCredential> _emailSignInOrUp(String e, String p) async {
-    try {
-      return await _auth.signInWithEmailAndPassword(email: e, password: p);
-    } on fb.FirebaseAuthException catch (err) {
-      if (err.code == 'user-not-found') {
-        return _auth.createUserWithEmailAndPassword(email: e, password: p);
-      }
-      rethrow;
-    }
-  }
-
-  Future<UserProfile> _seed(
-    fb.User user, {
-    String? name,
-    bool isGuest = false,
-  }) async {
-    final profile = UserProfile.initial(
-      id: user.uid,
-      name: name?.trim().isNotEmpty == true
-          ? name!.trim()
-          : (user.displayName ?? 'Learner'),
-      email: user.email,
-      isGuest: isGuest,
-    );
-    await _doc(user.uid).set(profile.toJson());
-    return profile;
-  }
-
-  @override
-  Future<void> signOut() async {
-    await GoogleSignIn().signOut();
-    await _auth.signOut();
-  }
-
-  @override
-  Future<void> deleteAccount() async {
-    final user = _auth.currentUser;
-    if (user == null) return;
-    await _doc(user.uid).delete();
-    await user.delete();
-  }
-}
-```
-
-## 5. Flip the wiring
-
-In `lib/providers/app_providers.dart`:
-
-```dart
-final authRepositoryProvider = Provider<AuthRepository>(
-  (ref) => FirebaseAuthRepository(),
-);
-```
-
-That is the entire integration. Nothing in `features/` changes.
-
-For Apple sign-in, add `sign_in_with_apple`, enable the *Sign in with Apple*
-capability in Xcode, and fill in the `AuthMethod.apple` branch above with the
-same credential exchange.
-
----
-
-## 6. Sync progress to Firestore
-
-`UserController._persist` currently writes only to `LocalStore`. To mirror to
-Firestore, extend it — keeping the local write **first** so the app stays
-responsive and offline-capable:
-
-```dart
-Future<void> _persist(UserProfile p) async {
-  state = p;
-  await _store.setJson(LocalStore.kProfile, p.toJson());   // source of truth
-  unawaited(ref.read(remoteSyncProvider).push(p));         // best effort
-}
-```
-
-Do not make the UI await the network. A learner finishing a lesson on a train
-should still see their XP.
-
-### Security rules
+Paste these into **Firestore → Rules** and publish. Without them your default
+rules either block everything or, worse, let any signed-in user read every other
+user's profile.
 
 ```
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
-      match /{sub=**} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
-      }
+    // A learner may read and write exactly one document: their own.
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      allow create: if request.auth != null
+                    && request.auth.uid == userId
+                    && request.resource.data.id == userId;
+
+      // The id can never be reassigned — that is the only field the client
+      // must not be able to change, since it is what these rules key on.
+      allow update: if request.auth != null
+                    && request.auth.uid == userId
+                    && request.resource.data.id == resource.data.id;
+
+      allow delete: if request.auth != null && request.auth.uid == userId;
     }
+
+    // Anything not matched above is denied.
   }
 }
 ```
 
-Ship these before your first real user. The default test-mode rules leave every
-document world-readable.
+---
+
+## What the code actually does
+
+**`FirebaseAuthRepository`** (`lib/data/repositories/firebase_auth_repository.dart`)
+
+- Email sign-up and log-in are separate paths — `isSignUp` comes from the toggle
+  on the auth screen — so "no such account" and "already registered" produce
+  the right message instead of a guess.
+- Google uses `google_sign_in` 7.x (`GoogleSignIn.instance.authenticate()`) and
+  exchanges the resulting ID token for a Firebase credential.
+- Apple goes through `OAuthProvider('apple.com')`, which uses the native sheet
+  on iOS and Firebase's hosted web flow on Android — no extra package.
+- Guest is `signInAnonymously()`. The profile keeps working and can be upgraded
+  to a real account later without losing progress.
+- Every Firebase error code is mapped to a sentence a learner can act on.
+
+**`FirestoreProfileSync`** (`lib/data/repositories/profile_sync.dart`)
+
+- Mirrors the profile to `users/{uid}`, debounced to one write per 5 seconds —
+  XP moves on nearly every tap, and a write per tap would be both slow and
+  expensive.
+- Flushed before sign-out, so the last session is never lost.
+- `LocalStore` stays the app's read path. Firestore is a backup, not a
+  dependency: pulls that fail return null and the local cache is used, so the
+  app keeps working offline.
+
+**Startup** (`lib/main.dart`)
+
+- If the placeholders are still in place, Firebase is skipped entirely.
+- If initialisation throws — no network on first run, bad config — it is caught
+  and the app starts on local accounts. It never crashes into a config error.
+
+## Verifying it works
+
+1. `flutter run`, sign up with an email, earn some XP.
+2. Check **Firestore → Data**: a `users/{uid}` document should appear within
+   about five seconds, with your XP in it.
+3. Uninstall the app, reinstall, log in with the same email. The XP and streak
+   should come back. **This is the test that matters** — it is the whole reason
+   the sync exists.
+4. Sign out and back in with Google. If it fails with
+   `ApiException: 10`, the SHA-1 fingerprint is missing or wrong (section 2).
+
+## Not yet done
+
+- **No account-linking UI.** A guest who later signs up with Google gets a new
+  account rather than upgrading the anonymous one; their guest progress stays
+  behind. `FirebaseAuth.currentUser.linkWithCredential()` is the fix.
+- **No merge strategy.** If the same account is used on two devices at once,
+  the last write wins and the other device's progress in that window is lost.
+  The `updatedAt` server timestamp is already written to support a smarter
+  merge later.
+- **None of this has been run against a real Firebase project**, because that
+  needs credentials and an Android build. Work through the verification steps
+  above before trusting it.

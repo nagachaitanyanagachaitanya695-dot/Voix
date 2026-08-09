@@ -86,8 +86,7 @@ version: 1.0.0+1   # 1.0.0 is shown to users, 1 is the versionCode
 - [ ] **Test the microphone and the voice on a real phone.** They have never run
       on hardware. This is the app's core feature.
 - [ ] **Host a privacy policy and link it in the Play Console.** Mandatory,
-      because the app requests `RECORD_AUDIO`. See `docs/PRIVACY_POLICY.md` for
-      a draft you can host as-is.
+      because the app requests `RECORD_AUDIO`. Not written yet.
 - [ ] **Fill in the Data Safety form.** Declare: audio recording (processed
       on-device by Android's speech recogniser, not uploaded by Voix), email
       address and name (only if you enable Firebase auth), and app activity /

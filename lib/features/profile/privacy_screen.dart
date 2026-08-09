@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/utils/context_ext.dart';
 import '../../core/widgets/staggered.dart';
+import '../../data/repositories/auth_repository.dart';
 import '../../providers/session_controller.dart';
 import '../../providers/user_controller.dart';
 import '../onboarding/onboarding_flow.dart';
@@ -183,7 +184,8 @@ class PrivacyScreen extends ConsumerWidget {
         title: const Text('Delete your account?'),
         content: const Text(
           'This permanently removes your profile, progress, streak and every '
-          'saved conversation from this device. This cannot be undone.',
+          'saved conversation — from this device and from your Voix account. '
+          'This cannot be undone.',
         ),
         actions: [
           TextButton(
@@ -202,7 +204,19 @@ class PrivacyScreen extends ConsumerWidget {
     );
 
     if (confirmed != true || !context.mounted) return;
-    await ref.read(userControllerProvider.notifier).deleteAccount();
+
+    try {
+      await ref.read(userControllerProvider.notifier).deleteAccount();
+    } on AuthException catch (e) {
+      // Firebase refuses to delete an account whose sign-in is more than a few
+      // minutes old, so this is a routine outcome rather than a rare failure.
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(e.message)));
+      return;
+    }
+
     if (!context.mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const OnboardingFlow()),
