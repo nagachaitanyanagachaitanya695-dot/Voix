@@ -7,578 +7,580 @@
 <meta name="description" content="Voix teaches you to speak confidently by having real conversations with an AI tutor that corrects your grammar, upgrades your vocabulary, and explains why. Flutter, on-device, offline.">
 <style>
 /* ───────────────────────────────────────────────────────────────
-   Lo-Fi. Paper-yellow ground, three riso inks, system fonts only.
-   Nothing here loads from a network.
+   Aurora. Dark saturated mesh gradient, the app's own brand ramp
+   (#22D8F0 → #3B7BFF → #8B5CF6), oversized display type, neon glow.
+   Type is a system stack — the page loads no fonts over the network.
    ─────────────────────────────────────────────────────────────── */
 :root{
-  --paper:#E8E0C0;
-  --paper-2:#EDE4CF;
-  --ink:#191713;
-  --pink:#FF006E;
-  --teal:#00A98F;
-  --teal-bright:#00FFCC;
-  --serif:"Times New Roman", Times, serif;
-  --sans:Helvetica, Arial, sans-serif;
-  --mono:"Courier New", Courier, monospace;
+  --bg:#04060F;
+  --bg-alt:#070B1A;
+  --cyan:#22D8F0;
+  --blue:#3B7BFF;
+  --indigo:#5B5BFF;
+  --violet:#8B5CF6;
+  --magenta:#EC4899;
+  --text:#F2F5FF;
+  --text-2:#9AA6C7;
+  --text-3:#64719A;
+  --glass:rgba(255,255,255,.055);
+  --glass-line:rgba(255,255,255,.10);
+  --ui:system-ui, -apple-system, "Segoe UI", Roboto, Inter, "Helvetica Neue", sans-serif;
+  --mono:ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --spring:cubic-bezier(.22,1.2,.36,1);
+  --ease:cubic-bezier(.4,0,.2,1);
 }
 
 *{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
+html{
+  scroll-behavior:smooth;
+  -webkit-text-size-adjust:100%;
+}
 body{
   margin:0;
-  background:var(--paper);
-  color:var(--ink);
-  font-family:var(--sans);
+  min-height:100%;
+  font-family:var(--ui);
+  color:var(--text);
+  background:var(--bg);
   overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+  line-height:1.6;
 }
 
-/* Halftone dot tile, used as the page's base texture. */
-body::before{
-  content:"";
+/* The mesh gradient is the primary surface feature, not a backdrop. */
+.mesh{
   position:fixed; inset:0; z-index:0; pointer-events:none;
-  background-image:radial-gradient(var(--ink) 0.7px, transparent 0.8px);
-  background-size:4px 4px;
-  opacity:.11;
+  background:
+    radial-gradient(58% 48% at 14% 8%,  rgba(59,123,255,.34), transparent 62%),
+    radial-gradient(52% 44% at 88% 12%, rgba(139,92,246,.32), transparent 62%),
+    radial-gradient(60% 52% at 74% 88%, rgba(236,72,153,.20), transparent 62%),
+    radial-gradient(52% 44% at 12% 84%, rgba(34,216,240,.18), transparent 62%),
+    var(--bg);
 }
-/* Photocopy fall-off in the corners. */
-body::after{
-  content:"";
-  position:fixed; inset:0; z-index:0; pointer-events:none;
-  background:radial-gradient(130% 100% at 50% 40%, transparent 55%, rgba(25,23,19,.22) 100%);
+/* Three oversized blooms, drifting. The app paints the same idea in one
+   layer rather than stacking blur filters; here they are cheap and fixed. */
+.bloom{
+  position:fixed; z-index:0; pointer-events:none;
+  border-radius:50%;
+  filter:blur(90px);
+  opacity:.5;
+  will-change:transform;
 }
-main, header, footer{position:relative; z-index:1}
+.bloom--1{width:46vw; height:46vw; left:-8vw;  top:2vh;  background:radial-gradient(circle, rgba(59,123,255,.55), transparent 70%)}
+.bloom--2{width:40vw; height:40vw; right:-6vw; top:26vh; background:radial-gradient(circle, rgba(139,92,246,.50), transparent 70%)}
+.bloom--3{width:52vw; height:52vw; left:22vw;  top:64vh; background:radial-gradient(circle, rgba(236,72,153,.34), transparent 70%)}
 
-a{color:var(--ink)}
+/* Film grain, keeps the gradients from banding. */
+.grain{
+  position:fixed; inset:0; z-index:1; pointer-events:none; opacity:.16;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='.42'/></svg>");
+}
 
-/* ── Typographic primitives ─────────────────────────────────── */
-.masthead{
-  font-family:var(--serif);
-  font-weight:700;
-  font-size:clamp(5.5rem, 21vw, 17rem);
-  line-height:.78;
-  letter-spacing:-.045em;
-  margin:0;
-  text-shadow:3px 0 var(--pink), -3px 0 var(--teal-bright);
+#scene{
+  position:fixed; inset:0; z-index:2;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity 900ms var(--ease);
 }
-h2{
-  font-family:var(--serif);
-  font-weight:700;
-  font-size:clamp(2.1rem, 5.6vw, 4.1rem);
-  line-height:.92;
-  letter-spacing:-.03em;
-  margin:0 0 .35em;
-  text-shadow:2px 0 var(--pink), -2px 0 var(--teal-bright);
+#scene.ready{opacity:1}
+
+.page{position:relative; z-index:3}
+
+/* ── Type ───────────────────────────────────────────────────── */
+h1,h2,h3{margin:0; line-height:1.04; letter-spacing:-.035em; font-weight:650}
+.display{
+  font-size:clamp(4.5rem, 18vw, 17rem);
+  font-weight:800;
+  letter-spacing:-.06em;
+  line-height:.86;
+  background:linear-gradient(96deg, var(--cyan) 0%, var(--blue) 34%, var(--violet) 68%, var(--magenta) 100%);
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+  filter:drop-shadow(0 0 42px rgba(91,91,255,.45));
 }
-h3{
-  font-family:var(--sans);
-  font-weight:700;
-  font-size:1.02rem;
-  line-height:1.25;
-  letter-spacing:-.01em;
-  margin:0 0 .3em;
-}
-p{line-height:1.55; margin:0 0 1em}
-.lede{
-  font-family:var(--serif);
-  font-size:clamp(1.15rem, 2.3vw, 1.6rem);
-  line-height:1.4;
-  max-width:34ch;
-}
-.note{
+h2{font-size:clamp(2rem, 4.6vw, 3.5rem)}
+h3{font-size:1.08rem; letter-spacing:-.015em; font-weight:600}
+p{margin:0 0 1rem}
+a{color:inherit}
+
+.eyebrow{
   font-family:var(--mono);
-  font-size:.74rem;
-  line-height:1.5;
+  font-size:.72rem;
+  letter-spacing:.22em;
   text-transform:uppercase;
-  letter-spacing:.08em;
+  color:var(--cyan);
+  margin:0 0 1.1rem;
+  text-shadow:0 0 20px rgba(34,216,240,.55);
 }
-.body{max-width:62ch; font-size:1rem}
+.lede{font-size:clamp(1.02rem,1.5vw,1.2rem); color:var(--text-2); max-width:56ch}
+.muted{color:var(--text-2)}
+.mono{font-family:var(--mono)}
 
 section{
-  padding:clamp(4rem, 9vw, 8.5rem) clamp(1.15rem, 5vw, 5rem);
-  max-width:1220px;
+  position:relative;
+  max-width:1180px;
   margin:0 auto;
+  padding:clamp(5rem,11vw,10rem) clamp(1.15rem,4vw,2.5rem);
 }
-.rule{
-  border:0;
-  border-top:2px solid var(--ink);
-  margin:0 clamp(1.15rem,5vw,5rem);
-  max-width:1220px;
-}
+.section-head{margin-bottom:clamp(2.4rem,5vw,4rem); max-width:62ch}
 
-/* ── Hero ───────────────────────────────────────────────────── */
-.hero{height:210vh; position:relative; padding:0; max-width:none}
-.hero-stage{
-  position:sticky; top:0;
-  height:100vh;
-  overflow:hidden;
+/* ── Nav ────────────────────────────────────────────────────── */
+.nav{
+  position:fixed; z-index:20;
+  top:.9rem; left:50%;
+  transform:translateX(-50%);
+  display:flex; align-items:center; gap:.35rem;
+  padding:.4rem .45rem .4rem .95rem;
+  border-radius:999px;
+  background:rgba(10,14,30,.55);
+  border:1px solid var(--glass-line);
+  backdrop-filter:blur(20px) saturate(150%);
+  -webkit-backdrop-filter:blur(20px) saturate(150%);
+  box-shadow:0 12px 40px rgba(0,0,0,.45);
+  max-width:calc(100vw - 1.6rem);
 }
-#riso{
-  position:absolute; inset:0;
-  width:100%; height:100%;
-  display:block;
+.nav__mark{
+  font-weight:800; letter-spacing:-.04em; font-size:1.02rem;
+  margin-right:.7rem;
+  background:linear-gradient(100deg,var(--cyan),var(--violet));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
 }
-.hero-fallback{
-  position:absolute; inset:0;
-  display:none;
-  place-items:center;
-  font-family:var(--mono);
-  font-size:.8rem;
-  text-align:center;
-  padding:2rem;
-}
-.no-webgl #riso{display:none}
-.no-webgl .hero-fallback{display:grid}
-
-/* The masthead is pasted onto the press sheet, not floated over it —
-   a paper panel with a hard offset shadow, tipped off-grid. */
-.hero-type{
-  position:absolute;
-  left:clamp(1.15rem,4.5vw,4rem);
-  bottom:clamp(1.8rem,5vw,3.6rem);
-  width:min(560px, 88vw);
-  background:var(--paper-2);
-  border:3px solid var(--ink);
-  box-shadow:12px 12px 0 var(--ink);
-  padding:clamp(1.1rem,2.4vw,1.9rem) clamp(1.1rem,2.4vw,1.9rem) clamp(1.3rem,2.6vw,1.9rem);
-  transform:rotate(-2.2deg);
-  transform-origin:left bottom;
-}
-.hero-type::after{  /* torn top edge */
-  content:"";
-  position:absolute;
-  left:-3px; right:-3px; top:-12px;
-  height:12px;
-  background:
-    repeating-linear-gradient(-63deg, var(--paper-2) 0 7px, transparent 7px 14px);
-  border-top:3px solid var(--ink);
-}
-.masthead-wrap{transform:rotate(-1.2deg); transform-origin:left bottom}
-.masthead{font-size:clamp(4.2rem, 12vw, 9.5rem)}
-.hero-sub{
-  font-family:var(--serif);
-  font-size:clamp(.98rem,1.7vw,1.24rem);
-  line-height:1.34;
-  max-width:34ch;
-  margin:1.1rem 0 1.2rem;
-}
-.hero-kicker{
-  position:absolute;
-  top:clamp(1.4rem,4vw,2.6rem);
-  left:clamp(1.15rem,5vw,5rem);
-  font-family:var(--mono);
-  font-size:.72rem;
-  letter-spacing:.13em;
-  text-transform:uppercase;
-  transform:rotate(-2deg);
-}
-.hero-hint{
-  position:absolute;
-  right:clamp(1.15rem,5vw,5rem);
-  bottom:clamp(2.2rem,6vw,4rem);
-  font-family:var(--mono);
-  font-size:.72rem;
-  letter-spacing:.09em;
-  text-transform:uppercase;
-  text-align:right;
-  transform:rotate(2.5deg);
-  max-width:15ch;
-  line-height:1.5;
-}
-
-/* ── Buttons: native controls, hard offset shadow ───────────── */
-.actions{display:flex; flex-wrap:wrap; gap:.9rem; transform:rotate(-1deg)}
-.btn{
-  font-family:var(--sans);
-  font-weight:700;
-  font-size:.94rem;
-  padding:.78rem 1.35rem;
-  background:var(--ink);
-  color:var(--paper);
-  border:2px solid var(--ink);
-  text-decoration:none;
-  display:inline-block;
-  box-shadow:6px 6px 0 var(--pink);
-  transition:transform 90ms steps(2), box-shadow 90ms steps(2);
-}
-.btn:hover{transform:translate(3px,3px); box-shadow:3px 3px 0 var(--pink)}
-.btn--ghost{
-  background:transparent;
-  color:var(--ink);
-  box-shadow:6px 6px 0 var(--teal);
-}
-.btn--ghost:hover{box-shadow:3px 3px 0 var(--teal)}
-
-/* ── Two-column intro ───────────────────────────────────────── */
-.split{
-  display:grid;
-  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
-  gap:clamp(1.6rem,4vw,4rem);
-  align-items:start;
-}
-/* minmax(0,…) rather than 1fr: the clone URL in <pre> is unbreakable and
-   would otherwise widen the track instead of scrolling inside it. */
-@media (max-width:800px){ .split{grid-template-columns:minmax(0,1fr)} }
-
-/* ── Verdict list: what the engine must catch / must not touch ─ */
-.verdicts{list-style:none; padding:0; margin:0}
-.verdicts li{
-  border-top:2px solid var(--ink);
-  padding:.85rem 0 .95rem;
-  display:grid;
-  grid-template-columns:auto minmax(0,1fr);
-  gap:.8rem;
-  align-items:baseline;
-}
-.verdicts li:last-child{border-bottom:2px solid var(--ink)}
-.mark{
-  font-family:var(--mono);
-  font-weight:700;
-  font-size:.7rem;
-  letter-spacing:.1em;
-  padding:.2rem .45rem;
-  border:2px solid var(--ink);
+.nav a{
+  font-size:.86rem; color:var(--text-2); text-decoration:none;
+  padding:.42rem .72rem; border-radius:999px;
+  transition:color 220ms var(--ease), background 220ms var(--ease);
   white-space:nowrap;
 }
-.mark--fix{background:var(--pink); color:var(--paper); border-color:var(--pink)}
-.mark--keep{background:var(--teal); color:var(--paper); border-color:var(--teal)}
-.sentence{font-family:var(--serif); font-size:1.16rem; line-height:1.3}
-.sentence del{text-decoration:line-through 2px var(--pink)}
-.sentence ins{text-decoration:none; font-family:var(--sans); font-weight:700}
-.why{
-  font-family:var(--mono);
-  font-size:.73rem;
-  line-height:1.55;
-  margin:.45rem 0 0;
-  max-width:52ch;
-}
+.nav a:hover{color:var(--text); background:rgba(255,255,255,.07)}
+.nav .btn{margin-left:.3rem}
+@media (max-width:720px){ .nav__links{display:none} }
 
-/* ── Card decks ─────────────────────────────────────────────── */
-.deck{
-  display:grid;
-  grid-template-columns:repeat(auto-fill, minmax(230px, 1fr));
-  gap:clamp(1.1rem, 2.6vw, 2rem);
-  margin-top:2.6rem;
-}
-.card{
+/* ── Buttons ────────────────────────────────────────────────── */
+.btn{
+  --glow:rgba(59,123,255,.5);
   position:relative;
-  background:var(--paper-2);
-  border:2px solid var(--ink);
-  padding:1.35rem 1.15rem 1.2rem;
-  box-shadow:7px 7px 0 rgba(25,23,19,.85);
-  min-height:118px;
+  display:inline-flex; align-items:center; gap:.5rem;
+  padding:.78rem 1.35rem;
+  border-radius:999px;
+  font-size:.92rem; font-weight:600;
+  text-decoration:none;
+  border:1px solid transparent;
+  background:linear-gradient(100deg,var(--blue),var(--violet));
+  color:#fff;
+  box-shadow:0 8px 30px var(--glow);
+  transition:transform 320ms var(--spring), box-shadow 320ms var(--ease), filter 320ms var(--ease);
+  overflow:hidden;
 }
-.card:nth-child(3n+1){transform:rotate(-2.2deg)}
-.card:nth-child(3n+2){transform:rotate(1.7deg)}
-.card:nth-child(3n+3){transform:rotate(-.9deg)}
-.card:nth-child(5n){box-shadow:7px 7px 0 var(--pink)}
-.card:nth-child(7n){box-shadow:7px 7px 0 var(--teal)}
-.card p{
-  font-family:var(--mono);
-  font-size:.75rem;
-  line-height:1.5;
-  margin:0;
-}
-.card .idx{
-  position:absolute;
-  top:.5rem; right:.6rem;
-  font-family:var(--mono);
-  font-size:.68rem;
-  font-weight:700;
-}
-/* Sticky-tape corner. */
-.card::before{
+.btn::after{  /* sheen sweep on hover */
   content:"";
-  position:absolute;
-  top:-11px; left:22px;
-  width:62px; height:21px;
-  background:rgba(0,169,143,.34);
-  border-left:1px solid rgba(25,23,19,.28);
-  border-right:1px solid rgba(25,23,19,.28);
-  transform:rotate(-6deg);
+  position:absolute; inset:0;
+  background:linear-gradient(105deg, transparent 30%, rgba(255,255,255,.32) 50%, transparent 70%);
+  transform:translateX(-120%);
+  transition:transform 700ms var(--ease);
 }
-.card:nth-child(even)::before{
-  background:rgba(255,0,110,.26);
-  left:auto; right:20px;
-  transform:rotate(5deg);
+.btn:hover{transform:translateY(-3px); box-shadow:0 14px 44px var(--glow); filter:saturate(115%)}
+.btn:hover::after{transform:translateX(120%)}
+.btn--ghost{
+  background:var(--glass);
+  border-color:var(--glass-line);
+  color:var(--text);
+  box-shadow:none;
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
 }
+.btn--ghost:hover{background:rgba(255,255,255,.10); box-shadow:0 10px 34px rgba(0,0,0,.4)}
+.btn--sm{padding:.5rem .95rem; font-size:.83rem}
 
-.tag{
-  display:inline-block;
-  font-family:var(--mono);
-  font-size:.63rem;
-  letter-spacing:.1em;
-  text-transform:uppercase;
-  border:2px solid var(--ink);
-  padding:.12rem .4rem;
-  margin-bottom:.55rem;
+/* ── Glass ──────────────────────────────────────────────────── */
+.glass{
+  position:relative;
+  background:linear-gradient(158deg, rgba(255,255,255,.075), rgba(255,255,255,.018));
+  border:1px solid var(--glass-line);
+  border-radius:20px;
+  backdrop-filter:blur(18px) saturate(140%);
+  -webkit-backdrop-filter:blur(18px) saturate(140%);
+  transition:transform 420ms var(--spring), border-color 320ms var(--ease), box-shadow 420ms var(--ease);
 }
-.tag--genz{background:var(--pink); color:var(--paper); border-color:var(--pink)}
+/* Gradient hairline that lights up on hover. */
+.glass::before{
+  content:"";
+  position:absolute; inset:-1px;
+  border-radius:inherit;
+  padding:1px;
+  background:linear-gradient(140deg, rgba(34,216,240,.55), rgba(139,92,246,.45), transparent 65%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor; mask-composite:exclude;
+  opacity:0;
+  transition:opacity 380ms var(--ease);
+  pointer-events:none;
+}
+.glass:hover::before{opacity:1}
 
-/* ── Lesson index: a printed contents page ──────────────────── */
-.index{border-top:2px solid var(--ink)}
-.index li{
+/* ── Hero ───────────────────────────────────────────────────── */
+.hero{
+  min-height:100svh;
+  display:flex; align-items:center;
+  padding-top:7rem; padding-bottom:4rem;
+  max-width:1180px;
+}
+.hero__inner{width:100%; max-width:44rem}
+.hero__sub{font-size:clamp(1.05rem,1.7vw,1.35rem); color:var(--text-2); max-width:38ch; margin:1.5rem 0 2.2rem}
+.hero__sub em{color:var(--text); font-style:italic}
+.hero__cta{display:flex; flex-wrap:wrap; gap:.8rem}
+.hero__stats{
+  display:flex; flex-wrap:wrap; gap:2.4rem;
+  margin-top:3.4rem; padding-top:1.8rem;
+  border-top:1px solid rgba(255,255,255,.08);
+}
+.hero__stats b{
+  display:block; font-size:1.85rem; font-weight:700; letter-spacing:-.03em;
+  background:linear-gradient(100deg,var(--cyan),var(--violet));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.hero__stats span{font-family:var(--mono); font-size:.7rem; letter-spacing:.13em; text-transform:uppercase; color:var(--text-3)}
+
+.scroll-cue{
+  position:absolute; left:50%; bottom:1.8rem; transform:translateX(-50%);
+  font-family:var(--mono); font-size:.66rem; letter-spacing:.2em; text-transform:uppercase;
+  color:var(--text-3); display:flex; flex-direction:column; align-items:center; gap:.55rem;
+}
+.scroll-cue i{
+  display:block; width:1px; height:38px;
+  background:linear-gradient(var(--cyan), transparent);
+  animation:cue 2.4s var(--ease) infinite;
+}
+@keyframes cue{0%{opacity:0; transform:scaleY(.3)}40%{opacity:1}100%{opacity:0; transform:scaleY(1) translateY(14px)}}
+
+/* ── Corrector ──────────────────────────────────────────────── */
+.corrector{padding:clamp(1.4rem,3vw,2.2rem)}
+.corrector__field{position:relative}
+.corrector textarea{
+  width:100%;
+  min-height:96px;
+  resize:vertical;
+  background:rgba(4,6,15,.55);
+  border:1px solid var(--glass-line);
+  border-radius:14px;
+  color:var(--text);
+  font-family:var(--ui);
+  font-size:clamp(1rem,1.6vw,1.22rem);
+  line-height:1.5;
+  padding:1rem 1.1rem;
+  outline:none;
+  transition:border-color 260ms var(--ease), box-shadow 260ms var(--ease);
+}
+.corrector textarea:focus{
+  border-color:rgba(34,216,240,.6);
+  box-shadow:0 0 0 4px rgba(34,216,240,.12);
+}
+.chips{display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.9rem}
+.chip{
+  font-family:var(--mono); font-size:.74rem;
+  padding:.36rem .72rem; border-radius:999px;
+  background:rgba(255,255,255,.05);
+  border:1px solid var(--glass-line);
+  color:var(--text-2);
+  cursor:pointer;
+  transition:transform 260ms var(--spring), color 220ms var(--ease), border-color 220ms var(--ease), background 220ms var(--ease);
+}
+.chip:hover{color:var(--text); border-color:rgba(34,216,240,.5); background:rgba(34,216,240,.10); transform:translateY(-2px)}
+
+.result{margin-top:1.5rem; min-height:120px}
+.result__line{font-size:clamp(1.05rem,1.8vw,1.35rem); line-height:1.45; margin-bottom:.9rem}
+.result__line del{color:var(--text-3); text-decoration:line-through; text-decoration-color:var(--magenta)}
+.result__line ins{
+  text-decoration:none; color:var(--cyan);
+  text-shadow:0 0 18px rgba(34,216,240,.5);
+}
+.result__why{display:grid; gap:.6rem; margin-top:1.1rem}
+.result__why li{
   list-style:none;
-  border-bottom:1px solid rgba(25,23,19,.45);
-  padding:.72rem .2rem;
-  display:grid;
-  grid-template-columns:2.7rem minmax(0,1fr) minmax(0,1fr);
-  gap:.7rem;
-  align-items:baseline;
+  display:grid; grid-template-columns:auto minmax(0,1fr); gap:.7rem; align-items:start;
+  font-size:.9rem; color:var(--text-2);
+  padding:.7rem .85rem;
+  border-radius:12px;
+  background:rgba(255,255,255,.035);
+  border:1px solid rgba(255,255,255,.07);
+  animation:rise 460ms var(--spring) both;
 }
-.index{padding:0; margin:2.4rem 0 0}
-.index .n{font-family:var(--mono); font-size:.78rem; font-weight:700}
-.index .t{font-family:var(--serif); font-size:1.14rem; line-height:1.2}
-.index .s{font-family:var(--sans); font-size:.82rem; line-height:1.3}
+.pill{
+  font-family:var(--mono); font-size:.62rem; letter-spacing:.1em; text-transform:uppercase;
+  padding:.22rem .5rem; border-radius:999px; white-space:nowrap;
+  border:1px solid currentColor;
+}
+.pill--grammar{color:var(--cyan)}
+.pill--vocabulary{color:var(--violet)}
+.pill--phrasing{color:var(--magenta)}
+.result__clean{
+  display:flex; align-items:center; gap:.6rem;
+  font-size:1rem; color:var(--text-2);
+}
+.result__clean b{color:#4ADE80; font-weight:600}
+@keyframes rise{from{opacity:0; transform:translateY(10px)}to{opacity:1; transform:none}}
+.result__note{font-family:var(--mono); font-size:.71rem; color:var(--text-3); margin-top:1.2rem; line-height:1.6}
+
+/* ── Grids ──────────────────────────────────────────────────── */
+.grid{display:grid; gap:1.1rem}
+.grid--3{grid-template-columns:repeat(auto-fit, minmax(270px,1fr))}
+.grid--4{grid-template-columns:repeat(auto-fill, minmax(232px,1fr))}
+.card{padding:1.5rem 1.4rem; height:100%}
+.card:hover{transform:translateY(-6px); border-color:rgba(255,255,255,.18); box-shadow:0 22px 60px rgba(0,0,0,.5)}
+.card h3{margin-bottom:.55rem}
+.card p{color:var(--text-2); font-size:.92rem; margin:0}
+.card__n{
+  font-family:var(--mono); font-size:.68rem; color:var(--text-3);
+  letter-spacing:.12em; display:block; margin-bottom:.9rem;
+}
+.tag{
+  display:inline-block; font-family:var(--mono); font-size:.6rem;
+  letter-spacing:.12em; text-transform:uppercase;
+  padding:.2rem .5rem; border-radius:999px; margin-bottom:.7rem;
+  color:var(--magenta); border:1px solid rgba(236,72,153,.45);
+  background:rgba(236,72,153,.10);
+}
+
+/* Lessons list */
+.lessons{display:grid; gap:0; margin-top:2.4rem; border-top:1px solid rgba(255,255,255,.08)}
+.lessons li{
+  list-style:none;
+  display:grid; grid-template-columns:3rem minmax(0,1.1fr) minmax(0,1fr);
+  gap:1rem; align-items:baseline;
+  padding:1.05rem .6rem;
+  border-bottom:1px solid rgba(255,255,255,.07);
+  transition:background 300ms var(--ease), padding-left 320ms var(--spring);
+}
+.lessons li:hover{background:rgba(255,255,255,.04); padding-left:1.3rem}
+.lessons .n{font-family:var(--mono); font-size:.76rem; color:var(--text-3)}
+.lessons .t{font-size:1.02rem; font-weight:550}
+.lessons .s{font-size:.88rem; color:var(--text-2)}
 @media (max-width:700px){
-  .index li{grid-template-columns:2.2rem minmax(0,1fr)}
-  .index .s{grid-column:2; font-size:.76rem}
+  .lessons li{grid-template-columns:2.4rem minmax(0,1fr)}
+  .lessons .s{grid-column:2}
 }
+
+/* Stack chips */
+.stack{display:flex; flex-wrap:wrap; gap:.6rem; margin-top:2rem}
+.stack span{
+  font-family:var(--mono); font-size:.8rem;
+  padding:.52rem .9rem; border-radius:999px;
+  background:rgba(255,255,255,.045);
+  border:1px solid var(--glass-line);
+  color:var(--text-2);
+  transition:transform 300ms var(--spring), color 240ms var(--ease), border-color 240ms var(--ease);
+}
+.stack span:hover{transform:translateY(-3px); color:var(--text); border-color:rgba(139,92,246,.55)}
+
+/* Flow diagram */
+.flow{
+  display:flex; flex-wrap:wrap; align-items:center; gap:.7rem;
+  font-family:var(--mono); font-size:.86rem; margin-top:1.6rem;
+}
+.flow b{
+  font-weight:400; padding:.5rem .85rem; border-radius:10px;
+  background:rgba(255,255,255,.05); border:1px solid var(--glass-line);
+}
+.flow i{color:var(--text-3); font-style:normal}
 
 /* ── State table ────────────────────────────────────────────── */
-.state{
-  width:100%;
-  border-collapse:collapse;
-  margin-top:2.4rem;
-  font-family:var(--sans);
-  font-size:.92rem;
-}
-.state th, .state td{
-  border:2px solid var(--ink);
-  padding:.62rem .75rem;
-  text-align:left;
-  vertical-align:top;
-}
+.state{width:100%; border-collapse:collapse; margin-top:2.2rem; font-size:.94rem}
 .state th{
-  font-family:var(--mono);
-  font-size:.68rem;
-  letter-spacing:.11em;
-  text-transform:uppercase;
-  background:var(--ink);
-  color:var(--paper);
+  text-align:left; font-family:var(--mono); font-size:.66rem;
+  letter-spacing:.16em; text-transform:uppercase; color:var(--text-3);
+  padding:0 1rem .8rem; font-weight:400;
 }
-.state td:last-child{font-family:var(--mono); font-size:.76rem; white-space:normal}
-.state tr:nth-child(even) td{background:rgba(25,23,19,.055)}
-.done{color:var(--teal); font-weight:700}
-.todo{color:var(--pink); font-weight:700}
-.state-wrap{overflow-x:auto}
+.state td{padding:.85rem 1rem; border-top:1px solid rgba(255,255,255,.07); vertical-align:top}
+.state tr{transition:background 260ms var(--ease)}
+.state tbody tr:hover{background:rgba(255,255,255,.035)}
+.state td:last-child{font-family:var(--mono); font-size:.78rem}
+.ok{color:#4ADE80}
+.wip{color:#FBBF24}
+.state-wrap{overflow-x:auto; margin:0 -1rem; padding:0 1rem}
 
-/* ── Badges ─────────────────────────────────────────────────── */
-.badges{display:flex; flex-wrap:wrap; gap:.7rem; margin-top:2.4rem; padding:0; list-style:none}
-.badges li{
-  font-family:var(--mono);
-  font-size:.76rem;
-  border:2px solid var(--ink);
-  padding:.42rem .7rem;
-  background:var(--paper-2);
-}
-.badges li:nth-child(4n+1){transform:rotate(-2.4deg)}
-.badges li:nth-child(4n+2){transform:rotate(1.9deg)}
-.badges li:nth-child(4n+3){transform:rotate(-1.1deg)}
-.badges li:nth-child(4n){transform:rotate(3deg)}
-
-/* ── Figures / stats ────────────────────────────────────────── */
-.figures{
-  display:grid;
-  grid-template-columns:repeat(auto-fit, minmax(140px,1fr));
-  gap:1px;
-  background:var(--ink);
-  border:2px solid var(--ink);
-  margin-top:2.6rem;
-}
-.figures div{background:var(--paper); padding:1.1rem .95rem}
-.figures b{
-  display:block;
-  font-family:var(--serif);
-  font-size:clamp(2rem,4.6vw,3.2rem);
-  line-height:.9;
-  font-weight:700;
-  letter-spacing:-.03em;
-}
-.figures span{
-  display:block;
-  font-family:var(--mono);
-  font-size:.68rem;
-  letter-spacing:.09em;
-  text-transform:uppercase;
-  margin-top:.5rem;
-  line-height:1.4;
-}
-
-/* ── Code / shell ───────────────────────────────────────────── */
-pre{
-  font-family:var(--mono);
-  font-size:.83rem;
-  line-height:1.7;
-  background:var(--ink);
-  color:var(--paper);
-  padding:1.1rem 1.2rem;
-  border:2px solid var(--ink);
-  box-shadow:7px 7px 0 var(--teal);
-  margin:1.6rem 0 0;
-  /* The clone URL is longer than the column; wrap it rather than clip it. */
+/* ── Code ───────────────────────────────────────────────────── */
+.code{
+  font-family:var(--mono); font-size:.84rem; line-height:1.85;
+  background:rgba(4,6,15,.6);
+  border:1px solid var(--glass-line);
+  border-radius:16px;
+  padding:1.2rem 1.3rem;
+  margin:0;
   white-space:pre-wrap;
   overflow-wrap:anywhere;
+  color:var(--text-2);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
 }
-pre b{color:var(--teal-bright); font-weight:400}
-pre span{opacity:.55}
-code{font-family:var(--mono); font-size:.88em}
+.code b{color:var(--cyan); font-weight:400}
+.code i{color:var(--text-3); font-style:normal}
 
-/* ── Footer ─────────────────────────────────────────────────── */
+/* ── Contact ────────────────────────────────────────────────── */
+.contact{padding:clamp(2rem,5vw,3.6rem); text-align:center; overflow:hidden}
+.contact h2{margin-bottom:1rem}
+.contact .hero__cta{justify-content:center; margin-top:2rem}
+
 footer{
-  border-top:2px solid var(--ink);
-  padding:clamp(2.5rem,6vw,4.5rem) clamp(1.15rem,5vw,5rem) 3.5rem;
-  max-width:1220px;
-  margin:0 auto;
+  max-width:1180px; margin:0 auto;
+  padding:3rem clamp(1.15rem,4vw,2.5rem) 4rem;
+  border-top:1px solid rgba(255,255,255,.07);
+  display:flex; flex-wrap:wrap; gap:1.2rem; justify-content:space-between;
+  font-family:var(--mono); font-size:.74rem; color:var(--text-3);
 }
-.footgrid{
-  display:grid;
-  grid-template-columns:repeat(auto-fit, minmax(210px,1fr));
-  gap:2rem;
-}
-footer p, footer li{font-family:var(--mono); font-size:.74rem; line-height:1.55}
-footer li{margin-bottom:.6rem}
-footer ul{list-style:none; padding:0; margin:0}
-footer h3{
-  font-family:var(--mono);
-  font-size:.68rem;
-  letter-spacing:.12em;
-  text-transform:uppercase;
-  border-bottom:2px solid var(--ink);
-  padding-bottom:.4rem;
-  margin-bottom:.7rem;
-}
+footer a{color:var(--text-2); text-decoration:none; transition:color 220ms var(--ease)}
+footer a:hover{color:var(--cyan)}
+
+/* ── Scroll reveal ──────────────────────────────────────────── */
+.reveal{opacity:0; transform:translateY(28px); transition:opacity 900ms var(--ease), transform 900ms var(--spring)}
+.reveal.in{opacity:1; transform:none}
 
 @media (prefers-reduced-motion: reduce){
-  .btn{transition:none}
+  html{scroll-behavior:auto}
+  .reveal{opacity:1; transform:none; transition:none}
+  .scroll-cue i{animation:none}
+  .bloom{display:none}
+  *{transition-duration:.01ms !important}
 }
 </style>
 </head>
 <body>
 
+<div class="mesh"></div>
+<div class="bloom bloom--1" data-depth="0.05"></div>
+<div class="bloom bloom--2" data-depth="0.09"></div>
+<div class="bloom bloom--3" data-depth="0.03"></div>
+<canvas id="scene"></canvas>
+<div class="grain"></div>
+
+<nav class="nav">
+  <span class="nav__mark">VOIX</span>
+  <span class="nav__links">
+    <a href="#try">Try it</a>
+    <a href="#engine">Engine</a>
+    <a href="#practice">Practice</a>
+    <a href="#stack">Stack</a>
+  </span>
+  <a class="btn btn--sm" href="https://github.com/nagachaitanyanagachaitanya695-dot/voix">Source</a>
+</nav>
+
+<div class="page">
+
 <!-- ══ HERO ═══════════════════════════════════════════════════ -->
-<header class="hero">
-  <div class="hero-stage">
-    <canvas id="riso"></canvas>
-    <div class="hero-fallback">
-      <p class="note">This browser has no WebGL2 context, so the correction deck is not drawn. Everything below still reads.</p>
+<section class="hero">
+  <div class="hero__inner">
+    <p class="eyebrow reveal">Flutter · Riverpod · runs offline</p>
+    <h1 class="display reveal">VOIX</h1>
+    <p class="hero__sub reveal">Your personal AI language tutor. It corrects your grammar,
+      upgrades your vocabulary, and explains <em>why</em> — not just <em>what</em>.</p>
+    <div class="hero__cta reveal">
+      <a class="btn" href="#try">Try the corrector</a>
+      <a class="btn btn--ghost" href="https://github.com/nagachaitanyanagachaitanya695-dot/voix">View the source</a>
     </div>
-
-    <p class="hero-kicker">Flutter&nbsp;·&nbsp;Riverpod&nbsp;·&nbsp;runs offline</p>
-    <p class="hero-hint">Drag to spin the deck</p>
-
-    <div class="hero-type">
-      <div class="masthead-wrap"><h1 class="masthead">VOIX</h1></div>
-      <p class="hero-sub">Your personal AI language tutor. It corrects your grammar, upgrades your vocabulary, and explains <em>why</em> — not just <em>what</em>.</p>
-      <div class="actions">
-        <a class="btn" href="https://github.com/nagachaitanyanagachaitanya695-dot/voix">View the source</a>
-        <a class="btn btn--ghost" href="#engine">How the correction works</a>
-      </div>
+    <div class="hero__stats reveal">
+      <div><b>14</b><span>Lessons</span></div>
+      <div><b>13</b><span>Scenarios</span></div>
+      <div><b>12</b><span>Achievements</span></div>
+      <div><b>52</b><span>Tests</span></div>
     </div>
   </div>
-</header>
+  <div class="scroll-cue"><i></i>Scroll</div>
+</section>
 
-<hr class="rule">
+<!-- ══ CORRECTOR ══════════════════════════════════════════════ -->
+<section id="try">
+  <div class="section-head reveal">
+    <p class="eyebrow">Live</p>
+    <h2>Say something wrong on purpose</h2>
+    <p class="lede">Every rule below is ported line for line from
+      <span class="mono">lib/data/services/grammar_engine.dart</span>. Same patterns, same
+      explanations, same one-correction-per-span ordering — running here in JavaScript
+      instead of Dart.</p>
+  </div>
+
+  <div class="glass corrector reveal">
+    <div class="corrector__field">
+      <label class="mono" style="font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--text-3);display:block;margin-bottom:.6rem">
+        Your sentence
+      </label>
+      <textarea id="input" spellcheck="false" placeholder="Type a sentence…">Did you went there? I have a doubt about the meeting.</textarea>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="result" id="result"></div>
+    <p class="result__note">The app runs this on-device, which is what makes correction
+      real-time — there is no round trip between finishing a sentence and seeing the fix.</p>
+  </div>
+</section>
 
 <!-- ══ ENGINE ═════════════════════════════════════════════════ -->
 <section id="engine">
-  <div class="split">
-    <div>
-      <h2>Grammar correction runs on the device</h2>
-      <p class="body"><code>lib/data/services/grammar_engine.dart</code> is a rule engine covering the mistakes learners actually make: subject–verb agreement with irregular and <em>-ies</em>/<em>-es</em> forms, tense after <em>did</em>, articles by vowel <em>sound</em>, uncountable nouns, double negatives, double comparatives, and a set of common Indian-English idioms.</p>
-      <p class="body">Running locally is what makes real-time correction viable — there is no round trip between finishing a sentence and seeing the fix. Rules are ordered most-specific-first and each span is corrected at most once, so overlapping rules cannot produce contradictory advice. When several rules fire, each contributes its own explanation but they share one fully-corrected sentence.</p>
-      <div class="figures">
-        <div><b>22</b><span>Correction tests, both directions</span></div>
-        <div><b>52</b><span>Tests in the suite</span></div>
-        <div><b>0</b><span>Issues from flutter analyze</span></div>
-      </div>
-    </div>
+  <div class="section-head reveal">
+    <p class="eyebrow">How it works</p>
+    <h2>Three things worth knowing</h2>
+  </div>
 
-    <div>
-      <p class="note" style="margin-bottom:1.1rem">Both directions have to hold</p>
-      <ul class="verdicts">
-        <li>
-          <span class="mark mark--fix">Fix</span>
-          <div>
-            <span class="sentence">Did you <del>went</del> <ins>go</ins> there?</span>
-            <p class="why">“Did” already marks the past, so the next verb stays in its base form.</p>
-          </div>
-        </li>
-        <li>
-          <span class="mark mark--fix">Fix</span>
-          <div>
-            <span class="sentence">I have a <del>doubt</del> <ins>question</ins></span>
-            <p class="why">For a question in class or a meeting, English uses “question”. “Doubt” means you do not believe something.</p>
-          </div>
-        </li>
-        <li>
-          <span class="mark mark--keep">Keep</span>
-          <div>
-            <span class="sentence">I doubt it will rain</span>
-            <p class="why">Scoped tightly. “I doubt it” is perfectly correct English and must not be flagged.</p>
-          </div>
-        </li>
-        <li>
-          <span class="mark mark--keep">Keep</span>
-          <div>
-            <span class="sentence">everyday English</span>
-            <p class="why">“Everyday” (one word) is an adjective. Flagged only when no noun follows, so this is left alone.</p>
-          </div>
-        </li>
-      </ul>
-    </div>
+  <div class="grid grid--3">
+    <article class="glass card reveal" data-tilt>
+      <span class="card__n">01</span>
+      <h3>Correction runs on the device</h3>
+      <p>A rule engine covering the mistakes learners actually make: subject–verb agreement,
+        tense after <em>did</em>, articles by vowel <em>sound</em>, uncountable nouns, double
+        negatives, double comparatives, and a set of common Indian-English idioms. Rules are
+        ordered most-specific-first and each span is corrected at most once, so overlapping
+        rules cannot contradict each other.</p>
+    </article>
+    <article class="glass card reveal" data-tilt>
+      <span class="card__n">02</span>
+      <h3>The visuals are vectors, not assets</h3>
+      <p>The splash orb, the VOIX mark, the waveform, every chart and the level badge are
+        <span class="mono">CustomPainter</span>s. The app ships no raster art beyond the
+        launcher icon, so it stays crisp at every density and the mark can animate its own
+        stroke.</p>
+    </article>
+    <article class="glass card reveal" data-tilt>
+      <span class="card__n">03</span>
+      <h3>Voice degrades, never blocks</h3>
+      <p><span class="mono">SpeechService</span> guards every platform call. No recogniser, a
+        denied permission, or a plain emulator all resolve to the same outcome: the
+        conversation screen switches to typed input and says why. The core feature is never
+        unreachable.</p>
+    </article>
   </div>
 </section>
 
-<hr class="rule">
+<!-- ══ PRACTICE ═══════════════════════════════════════════════ -->
+<section id="practice">
+  <div class="section-head reveal">
+    <p class="eyebrow">Practice</p>
+    <h2>Thirteen roleplay scenarios</h2>
+    <p class="lede">Eight standard settings, five written in Gen-Z register. Each opens with
+      its own first line and three suggested replies.</p>
+  </div>
 
-<!-- ══ VECTORS ════════════════════════════════════════════════ -->
-<section>
-  <div class="split">
-    <div>
-      <h2>The visuals are vectors, not assets</h2>
-      <p class="body">The splash orb, the VOIX mark, the waveform, every chart and the level badge are <code>CustomPainter</code>s. The app ships no raster art beyond the launcher icon, so it stays crisp at every density and the mark can animate its own stroke.</p>
-      <p class="body">The aurora backdrop deliberately avoids <code>BackdropFilter</code>: it paints three oversized radial blooms into one layer. Stacked blur filters are the usual reason a dark gradient UI drops frames on mid-range Android.</p>
-    </div>
-    <div>
-      <h2>Voice degrades, never blocks</h2>
-      <p class="body"><code>SpeechService</code> guards every platform call. No recogniser, a denied permission, or a plain emulator all resolve to the same outcome: the conversation screen switches to typed input and says why. The core feature is never unreachable.</p>
-      <p class="body">Colours are a <code>ThemeExtension</code>, so widgets read <code>context.colors.textSecondary</code> and get the right value for the active brightness without branching. Motion is 160 / 260 / 420 ms — short on purpose.</p>
-    </div>
+  <div class="grid grid--4">
+    <article class="glass card reveal" data-tilt><span class="card__n">01</span><h3>Free Conversation</h3><p>Talk about anything on your mind</p></article>
+    <article class="glass card reveal" data-tilt><span class="card__n">02</span><h3>Ordering Food at a Restaurant</h3><p>Order, ask questions, handle the bill</p></article>
+    <article class="glass card reveal" data-tilt><span class="card__n">03</span><h3>Job Interview Practice</h3><p>Answer common interview questions</p></article>
+    <article class="glass card reveal" data-tilt><span class="card__n">04</span><h3>Talking About My Weekend</h3><p>Practise past tense naturally</p></article>
+    <article class="glass card reveal" data-tilt><span class="card__n">05</span><h3>Shopping for Clothes</h3><p>Sizes, prices, asking for help</p></article>
+    <article class="glass card reveal" data-tilt><span class="card__n">06</span><h3>At the Doctor</h3><p>Describe symptoms clearly</p></article>
+    <article class="glass card reveal" data-tilt><span class="card__n">07</span><h3>At the Airport</h3><p>Check-in, security, directions</p></article>
+    <article class="glass card reveal" data-tilt><span class="card__n">08</span><h3>Giving a Presentation</h3><p>Open, explain, handle questions</p></article>
+    <article class="glass card reveal" data-tilt><span class="tag">Gen-Z</span><h3>Group Chat Energy</h3><p>Keep up with fast, casual texting talk</p></article>
+    <article class="glass card reveal" data-tilt><span class="tag">Gen-Z</span><h3>Hyping Up a Friend</h3><p>Compliments that sound natural, not cringe</p></article>
+    <article class="glass card reveal" data-tilt><span class="tag">Gen-Z</span><h3>Gaming Voice Chat</h3><p>Callouts, banter, gaming vocabulary</p></article>
+    <article class="glass card reveal" data-tilt><span class="tag">Gen-Z</span><h3>Reacting to Posts</h3><p>Comment like a native, not a bot</p></article>
+    <article class="glass card reveal" data-tilt><span class="tag">Gen-Z</span><h3>Casual to Formal Switch</h3><p>Know when to drop the slang</p></article>
   </div>
 </section>
-
-<hr class="rule">
-
-<!-- ══ SCENARIOS ══════════════════════════════════════════════ -->
-<section>
-  <h2>Thirteen roleplay scenarios</h2>
-  <p class="lede">Eight standard settings, five written in Gen-Z register. Each opens with its own first line and three suggested replies.</p>
-
-  <div class="deck">
-    <article class="card"><span class="idx">01</span><h3>Free Conversation</h3><p>Talk about anything on your mind</p></article>
-    <article class="card"><span class="idx">02</span><h3>Ordering Food at a Restaurant</h3><p>Order, ask questions, handle the bill</p></article>
-    <article class="card"><span class="idx">03</span><h3>Job Interview Practice</h3><p>Answer common interview questions</p></article>
-    <article class="card"><span class="idx">04</span><h3>Talking About My Weekend</h3><p>Practise past tense naturally</p></article>
-    <article class="card"><span class="idx">05</span><h3>Shopping for Clothes</h3><p>Sizes, prices, asking for help</p></article>
-    <article class="card"><span class="idx">06</span><h3>At the Doctor</h3><p>Describe symptoms clearly</p></article>
-    <article class="card"><span class="idx">07</span><h3>At the Airport</h3><p>Check-in, security, directions</p></article>
-    <article class="card"><span class="idx">08</span><h3>Giving a Presentation</h3><p>Open, explain, handle questions</p></article>
-    <article class="card"><span class="tag tag--genz">Gen-Z</span><span class="idx">09</span><h3>Group Chat Energy</h3><p>Keep up with fast, casual texting talk</p></article>
-    <article class="card"><span class="tag tag--genz">Gen-Z</span><span class="idx">10</span><h3>Hyping Up a Friend</h3><p>Compliments that sound natural, not cringe</p></article>
-    <article class="card"><span class="tag tag--genz">Gen-Z</span><span class="idx">11</span><h3>Gaming Voice Chat</h3><p>Callouts, banter, gaming vocabulary</p></article>
-    <article class="card"><span class="tag tag--genz">Gen-Z</span><span class="idx">12</span><h3>Reacting to Posts</h3><p>Comment like a native, not a bot</p></article>
-    <article class="card"><span class="tag tag--genz">Gen-Z</span><span class="idx">13</span><h3>Casual to Formal Switch</h3><p>Know when to drop the slang</p></article>
-  </div>
-</section>
-
-<hr class="rule">
 
 <!-- ══ LESSONS ════════════════════════════════════════════════ -->
 <section>
-  <h2>Fourteen lessons, six exercise types</h2>
-  <p class="lede">Typed Dart in <code>lib/data/content/</code>, not JSON — the catalogue is checked by the compiler.</p>
+  <div class="section-head reveal">
+    <p class="eyebrow">Curriculum</p>
+    <h2>Fourteen lessons, six exercise types</h2>
+    <p class="lede">Typed Dart in <span class="mono">lib/data/content/</span>, not JSON — the
+      catalogue is checked by the compiler.</p>
+  </div>
 
-  <ol class="index">
+  <ol class="lessons reveal">
     <li><span class="n">01</span><span class="t">Present Simple Basics</span><span class="s">He goes, she does, it works</span></li>
     <li><span class="n">02</span><span class="t">Talking About Yesterday</span><span class="s">Regular and irregular past verbs</span></li>
     <li><span class="n">03</span><span class="t">A, An &amp; The</span><span class="s">The small words that trip everyone up</span></li>
@@ -596,616 +598,713 @@ footer h3{
   </ol>
 </section>
 
-<hr class="rule">
+<!-- ══ STACK ══════════════════════════════════════════════════ -->
+<section id="stack">
+  <div class="section-head reveal">
+    <p class="eyebrow">Stack</p>
+    <h2>Built with</h2>
+    <p class="lede">Nothing points back up the dependency chain. Every screen reads state
+      through Riverpod; no screen constructs a repository directly.</p>
+  </div>
 
-<!-- ══ ACHIEVEMENTS ═══════════════════════════════════════════ -->
-<section>
-  <h2>Twelve achievements</h2>
-  <p class="lede">XP, levels and streaks are computed locally and covered by 22 tests of their own.</p>
-  <ul class="badges">
-    <li>First Conversation</li>
-    <li>Getting Started</li>
-    <li>5-Day Streak</li>
-    <li>Level 5 Reached</li>
-    <li>Word Collector</li>
-    <li>Chatterbox</li>
-    <li>Fortnight Fire</li>
-    <li>Five Hours In</li>
-    <li>Dedicated Learner</li>
-    <li>Double Digits</li>
-    <li>Unstoppable</li>
-    <li>XP Master</li>
-  </ul>
-</section>
+  <div class="reveal">
+    <div class="flow">
+      <b>features</b><i>→</i><b>providers</b><i>→</i><b>data</b><i>→</i><b>core</b>
+    </div>
+    <div class="stack">
+      <span>Flutter 3.35</span><span>Dart 3.5</span><span>flutter_riverpod</span>
+      <span>shared_preferences</span><span>speech_to_text</span><span>flutter_tts</span>
+      <span>firebase_auth</span><span>cloud_firestore</span><span>google_sign_in</span>
+      <span>flutter_local_notifications</span><span>web_socket_channel</span><span>record</span>
+    </div>
+  </div>
 
-<hr class="rule">
-
-<!-- ══ STATE ══════════════════════════════════════════════════ -->
-<section>
-  <h2>What is built, and what is not</h2>
-  <p class="lede">The app runs end to end on a fresh clone. Three things still need wiring, and this is the list.</p>
-
-  <div class="state-wrap">
-  <table class="state">
-    <thead><tr><th scope="col">Area</th><th scope="col">State</th></tr></thead>
-    <tbody>
-      <tr><td>Splash, onboarding (11 steps), auth</td><td class="done">Complete</td></tr>
-      <tr><td>Home, Learn, Practice, Progress, Profile</td><td class="done">Complete</td></tr>
-      <tr><td>AI conversation and coaching report</td><td class="done">Complete, on-device</td></tr>
-      <tr><td>14 lessons / 6 exercise types</td><td class="done">Complete</td></tr>
-      <tr><td>13 roleplay scenarios (Standard + Gen-Z)</td><td class="done">Complete</td></tr>
-      <tr><td>XP, levels, streaks, 12 achievements</td><td class="done">Complete</td></tr>
-      <tr><td>Settings, notifications, privacy, help</td><td class="done">Complete</td></tr>
-      <tr><td>Speech-to-text / text-to-speech</td><td class="done">Complete (device engines)</td></tr>
-      <tr><td>Google / Apple sign-in</td><td class="todo">Needs Firebase — see docs/FIREBASE_SETUP.md</td></tr>
-      <tr><td>Push notification delivery</td><td class="todo">Needs a plugin — see docs/BACKEND.md</td></tr>
-      <tr><td>Play Billing for Pro</td><td class="todo">Not wired — see docs/BACKEND.md</td></tr>
-    </tbody>
-  </table>
+  <div class="grid grid--3 reveal" style="margin-top:2.6rem">
+    <article class="glass card" data-tilt>
+      <h3>Swappable seams</h3>
+      <p><span class="mono">AuthRepository</span> and <span class="mono">AiTutorService</span>
+        are interfaces with a single wiring point each in
+        <span class="mono">lib/providers/app_providers.dart</span>. Replacing the local
+        implementation with Firebase or a hosted LLM is a one-line override — no UI change.</p>
+    </article>
+    <article class="glass card" data-tilt>
+      <h3>Design tokens</h3>
+      <p>Colours are a <span class="mono">ThemeExtension</span>, so widgets read
+        <span class="mono">context.colors.textSecondary</span> and get the right value for the
+        active brightness without branching. Brand ramp #22D8F0 → #3B7BFF → #8B5CF6. Motion
+        160 / 260 / 420 ms.</p>
+    </article>
+    <article class="glass card" data-tilt>
+      <h3>Accessibility</h3>
+      <p>OS text scaling honoured up to 1.3×, clamped so fixed-height chrome survives.
+        Semantic labels on icon buttons, charts, achievements and score rings. Cards size to a
+        <em>minimum</em> height, so larger text grows the layout instead of clipping it.</p>
+    </article>
   </div>
 </section>
 
-<hr class="rule">
-
-<!-- ══ RUN IT ═════════════════════════════════════════════════ -->
+<!-- ══ STATE ══════════════════════════════════════════════════ -->
 <section>
-  <div class="split">
-    <div>
-      <h2>Run it</h2>
-      <p class="body">No backend, no API keys, no config files. Requires Flutter 3.35+ (Dart 3.5+).</p>
-      <pre><b>$</b> git clone https://github.com/nagachaitanyanagachaitanya695-dot/voix
+  <div class="section-head reveal">
+    <p class="eyebrow">Status</p>
+    <h2>What is built, and what is not</h2>
+    <p class="lede">The app runs end to end on a fresh clone. Three things still need wiring,
+      and this is the list.</p>
+  </div>
+
+  <div class="state-wrap reveal">
+    <table class="state">
+      <thead><tr><th scope="col">Area</th><th scope="col">State</th></tr></thead>
+      <tbody>
+        <tr><td>Splash, onboarding (11 steps), auth</td><td class="ok">Complete</td></tr>
+        <tr><td>Home, Learn, Practice, Progress, Profile</td><td class="ok">Complete</td></tr>
+        <tr><td>AI conversation and coaching report</td><td class="ok">Complete, on-device</td></tr>
+        <tr><td>14 lessons / 6 exercise types</td><td class="ok">Complete</td></tr>
+        <tr><td>13 roleplay scenarios (Standard + Gen-Z)</td><td class="ok">Complete</td></tr>
+        <tr><td>XP, levels, streaks, 12 achievements</td><td class="ok">Complete</td></tr>
+        <tr><td>Settings, notifications, privacy, help</td><td class="ok">Complete</td></tr>
+        <tr><td>Speech-to-text / text-to-speech</td><td class="ok">Complete (device engines)</td></tr>
+        <tr><td>Google / Apple sign-in</td><td class="wip">Needs Firebase — docs/FIREBASE_SETUP.md</td></tr>
+        <tr><td>Push notification delivery</td><td class="wip">Needs a plugin — docs/BACKEND.md</td></tr>
+        <tr><td>Play Billing for Pro</td><td class="wip">Not wired — docs/BACKEND.md</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══ CONTACT ════════════════════════════════════════════════ -->
+<section id="contact">
+  <div class="glass contact reveal">
+    <p class="eyebrow">Get started</p>
+    <h2>No backend, no API keys, no config files</h2>
+    <p class="lede" style="margin:1rem auto 0">The app runs end to end on a fresh clone.
+      Requires Flutter 3.35+ (Dart 3.5+).</p>
+    <pre class="code" style="text-align:left;max-width:36rem;margin:2rem auto 0"><b>$</b> git clone https://github.com/nagachaitanyanagachaitanya695-dot/voix
 <b>$</b> cd voix
 <b>$</b> flutter pub get
-<b>$</b> flutter run</pre>
-    </div>
-    <div>
-      <h2>Check it</h2>
-      <p class="body">The widget tests use a tall surface and repeated pumps rather than <code>pumpAndSettle</code> — the aurora and orb animate forever by design, so the tree never quiesces.</p>
-      <pre><b>$</b> flutter analyze   <span>#</span> 0 issues
-<b>$</b> flutter test      <span>#</span> 52 tests</pre>
+<b>$</b> flutter run
+
+<b>$</b> flutter analyze   <i># 0 issues</i>
+<b>$</b> flutter test      <i># 52 tests</i></pre>
+    <div class="hero__cta">
+      <a class="btn" href="https://github.com/nagachaitanyanagachaitanya695-dot/voix">Open on GitHub</a>
+      <a class="btn btn--ghost" href="#try">Try the corrector</a>
     </div>
   </div>
 </section>
 
 <footer>
-  <div class="footgrid">
-    <div>
-      <h3>Architecture</h3>
-      <ul>
-        <li>features → providers → data → core</li>
-        <li>Nothing points back up</li>
-        <li>AuthRepository and AiTutorService are interfaces with one wiring point each in lib/providers/app_providers.dart</li>
-      </ul>
-    </div>
-    <div>
-      <h3>Design tokens</h3>
-      <ul>
-        <li>Brand ramp #22D8F0 → #3B7BFF → #8B5CF6</li>
-        <li>Plus Jakarta Sans for UI, Manrope for figures</li>
-        <li>Motion 160 / 260 / 420 ms</li>
-      </ul>
-    </div>
-    <div>
-      <h3>Accessibility</h3>
-      <ul>
-        <li>OS text scaling honoured up to 1.3×</li>
-        <li>Semantic labels on icon buttons, charts, achievements and score rings</li>
-        <li>Cards size to a minimum height, so larger text grows the layout instead of clipping it</li>
-      </ul>
-    </div>
-    <div>
-      <h3>Licence</h3>
-      <ul>
-        <li>Fonts: Plus Jakarta Sans and Manrope, SIL Open Font License 1.1</li>
-      </ul>
-      <p style="margin-top:1.2rem"><a href="https://github.com/nagachaitanyanagachaitanya695-dot/voix">github.com/nagachaitanyanagachaitanya695-dot/voix</a></p>
-    </div>
-  </div>
+  <span>Voix — your personal AI language tutor</span>
+  <span>Fonts in-app: Plus Jakarta Sans &amp; Manrope, SIL OFL 1.1 · 3D by <a href="vendor/THREE-LICENSE.txt">three.js</a>, MIT</span>
+  <a href="https://github.com/nagachaitanyanagachaitanya695-dot/voix">github.com/nagachaitanyanagachaitanya695-dot/voix</a>
 </footer>
 
+</div>
+
+<script src="vendor/three.min.js"></script>
 <script>
 (function () {
   'use strict';
 
-  /* ══════════════════════════════════════════════════════════════
-     A riso press, simulated.
-
-     The scene renders each correction as text painted into a canvas
-     texture, where the RGB channels are not colour — they are ink
-     separations. Red channel = pink plate, green = teal plate,
-     blue = black plate. Quads are drawn with additive blending, so
-     overlapping type accumulates coverage exactly the way overprinted
-     ink does.
-
-     A second pass screens each plate through its own rotated dot
-     grid, offsets it a couple of pixels off-register, and multiplies
-     it down onto paper. Everything is stepped to 12 frames a second.
-     ══════════════════════════════════════════════════════════════ */
-
-  var CARDS = [
-    { wrong: 'Did you went there?',        right: 'Did you go there?',
-      why:   '"Did" already marks the past, so the next verb stays in its base form.' },
-    { wrong: 'I have went there',          right: 'I have gone there',
-      why:   'The past participle of "go" is "gone": I have gone.' },
-    { wrong: 'He go to work',              right: 'He goes to work',
-      why:   'With he / she / it in the simple present, the verb takes -s.' },
-    { wrong: 'Let us discuss about it',    right: 'Let us discuss it',
-      why:   '"Discuss" already means "talk about" - drop the "about".' },
-    { wrong: 'I need more informations',   right: 'I need more information',
-      why:   'This is an uncountable noun in English - it has no plural form.' },
-    { wrong: 'Many peoples came',          right: 'Many people came',
-      why:   '"People" is already plural.' },
-    { wrong: 'This is more better',        right: 'This is better',
-      why:   'Do not use "more" with a word that is already comparative.' },
-    { wrong: 'I have a doubt',             right: 'I have a question',
-      why:   'For a question in class or a meeting, English uses "question".' },
-    { wrong: 'I am out of station',        right: 'I am out of town',
-      why:   'Native speakers say "out of town".' },
-    { wrong: 'Please revert back',         right: 'Please revert',
-      why:   'The "back" / "again" is already contained in the verb.' },
-    { wrong: 'I met an university friend', right: 'I met a university friend',
-      why:   'Use "a" when the next word starts with a consonant sound.' },
-    { wrong: 'I am having two brothers',   right: 'I have two brothers',
-      why:   'For things you own or relationships, use "I have" - not "I am having".' },
-    { wrong: 'I have been here since 2 years', right: 'I have been here for 2 years',
-      why:   'Use "for" with a length of time and "since" with a starting point.' },
-    { wrong: 'What is your good name?',    right: "What's your name?",
-      why:   'Adding "good" sounds unusual in English.' },
-    { wrong: "I didn't see nothing",       right: "I didn't see anything",
-      why:   'English uses one negative per clause.' },
-    { wrong: 'Please do the needful',      right: 'Please take care of it',
-      why:   'Say specifically what you need - e.g. "please take a look".' }
-  ];
-
-  var canvas = document.getElementById('riso');
-  var gl = canvas.getContext('webgl2', { alpha: false, antialias: false });
-  if (!gl) { document.body.classList.add('no-webgl'); return; }
-
-  /* ── Shaders ────────────────────────────────────────────────── */
-
-  var CARD_VS = [
-    '#version 300 es',
-    'in vec2 aPos;',
-    'uniform mat4 uProj;',
-    'uniform mat4 uModel;',
-    'out vec2 vUv;',
-    'void main(){',
-    '  vUv = aPos + 0.5;',
-    '  gl_Position = uProj * uModel * vec4(aPos, 0.0, 1.0);',
-    '}'
-  ].join('\n');
-
-  // The texture already carries its ink separation in RGB, premultiplied.
-  var CARD_FS = [
-    '#version 300 es',
-    'precision highp float;',
-    'in vec2 vUv;',
-    'uniform sampler2D uTex;',
-    'uniform float uFade;',
-    'out vec4 frag;',
-    'void main(){',
-    '  vec4 t = texture(uTex, vec2(vUv.x, 1.0 - vUv.y));',
-    '  frag = vec4(t.rgb * uFade, t.a * uFade);',
-    '}'
-  ].join('\n');
-
-  var POST_VS = [
-    '#version 300 es',
-    'in vec2 aPos;',
-    'out vec2 vUv;',
-    'void main(){',
-    '  vUv = aPos * 0.5 + 0.5;',
-    '  gl_Position = vec4(aPos, 0.0, 1.0);',
-    '}'
-  ].join('\n');
-
-  var POST_FS = [
-    '#version 300 es',
-    'precision highp float;',
-    'in vec2 vUv;',
-    'uniform sampler2D uScene;',
-    'uniform vec2  uRes;',
-    'uniform float uTime;',
-    'out vec4 frag;',
-
-    'const vec3 PAPER = vec3(0.910, 0.878, 0.753);',
-    'const vec3 PINK  = vec3(1.000, 0.000, 0.430);',
-    'const vec3 TEAL  = vec3(0.000, 0.760, 0.660);',
-    'const vec3 BLACK = vec3(0.130, 0.120, 0.105);',
-
-    'float hash(vec2 p){',
-    '  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);',
-    '}',
-
-    // One ink plate: sample off-register, then screen it through a
-    // rotated dot grid whose dot radius tracks coverage.
-    'float plate(int ch, vec2 off, float angle, float freq){',
-    '  vec2 uv = vUv + off / uRes;',
-    '  vec3 s = texture(uScene, uv).rgb;',
-    '  float cov = ch == 0 ? s.r : (ch == 1 ? s.g : s.b);',
-    '  cov = clamp(cov * 1.28, 0.0, 1.0);',
-    '  float c = cos(angle), sn = sin(angle);',
-    '  vec2 p = vec2(gl_FragCoord.x * c - gl_FragCoord.y * sn,',
-    '               gl_FragCoord.x * sn + gl_FragCoord.y * c) / freq;',
-    '  float d = length(fract(p) - 0.5);',
-    '  float r = sqrt(cov) * 0.72;',
-    '  return 1.0 - smoothstep(r - 0.10, r + 0.10, d);',
-    '}',
-
-    'void main(){',
-    // Misregistration wanders a little each stepped frame, like a hand-fed press.
-    '  float j = (hash(vec2(uTime, 3.0)) - 0.5) * 1.6;',
-    '  float k = (hash(vec2(uTime, 9.0)) - 0.5) * 1.6;',
-    '  float aP = plate(0, vec2( 2.4 + j, -1.1 + k), 0.2618, 5.4);',
-    '  float aT = plate(1, vec2(-2.2 + k,  1.5 + j), 1.3090, 5.4);',
-    '  float aB = plate(2, vec2( 0.3,      0.3    ), 0.7854, 4.9);',
-
-    '  vec3 col = PAPER;',
-    '  col = mix(col, col * TEAL,  aT);',
-    '  col = mix(col, col * PINK,  aP);',
-    '  col = mix(col, col * BLACK, aB);',
-
-    // Paper grain and toner fall-off.
-    '  float g = hash(floor(gl_FragCoord.xy * 0.7) + uTime * 13.0);',
-    '  col += (g - 0.5) * 0.055;',
-    '  float v = distance(vUv, vec2(0.5)) ;',
-    '  col *= 1.0 - smoothstep(0.42, 0.95, v) * 0.30;',
-    '  frag = vec4(col, 1.0);',
-    '}'
-  ].join('\n');
-
-  /* ── GL plumbing ────────────────────────────────────────────── */
-
-  function compile(src, type) {
-    var sh = gl.createShader(type);
-    gl.shaderSource(sh, src);
-    gl.compileShader(sh);
-    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
-      throw new Error(gl.getShaderInfoLog(sh));
-    }
-    return sh;
-  }
-  function program(vs, fs) {
-    var p = gl.createProgram();
-    gl.attachShader(p, compile(vs, gl.VERTEX_SHADER));
-    gl.attachShader(p, compile(fs, gl.FRAGMENT_SHADER));
-    gl.bindAttribLocation(p, 0, 'aPos');
-    gl.linkProgram(p);
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
-      throw new Error(gl.getProgramInfoLog(p));
-    }
-    return p;
-  }
-
-  var cardProg, postProg;
-  try {
-    cardProg = program(CARD_VS, CARD_FS);
-    postProg = program(POST_VS, POST_FS);
-  } catch (e) {
-    document.body.classList.add('no-webgl');
-    return;
-  }
-
-  var quad = gl.createVertexArray();
-  gl.bindVertexArray(quad);
-  var buf = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-  gl.bufferData(gl.ARRAY_BUFFER,
-    new Float32Array([-0.5, -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, 0.5]), gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(0);
-  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-
-  var fsQuad = gl.createVertexArray();
-  gl.bindVertexArray(fsQuad);
-  var fsBuf = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, fsBuf);
-  gl.bufferData(gl.ARRAY_BUFFER,
-    new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(0);
-  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-  gl.bindVertexArray(null);
-
-  var uProj  = gl.getUniformLocation(cardProg, 'uProj');
-  var uModel = gl.getUniformLocation(cardProg, 'uModel');
-  var uTex   = gl.getUniformLocation(cardProg, 'uTex');
-  var uFade  = gl.getUniformLocation(cardProg, 'uFade');
-  var uScene = gl.getUniformLocation(postProg, 'uScene');
-  var uRes   = gl.getUniformLocation(postProg, 'uRes');
-  var uTimeP = gl.getUniformLocation(postProg, 'uTime');
-
-  /* ── Card textures: type painted straight into ink plates ───── */
-
-  var TEX_W = 1024, TEX_H = 512;
-  var PLATE_PINK  = '#FF0000';   // red channel   -> pink plate
-  var PLATE_TEAL  = '#00FF00';   // green channel -> teal plate
-  var PLATE_BLACK = '#0000FF';   // blue channel  -> black plate
-
-  function fitFont(ctx, text, weightStyle, family, start, maxW) {
-    var size = start;
-    do {
-      ctx.font = weightStyle + ' ' + size + 'px ' + family;
-      if (ctx.measureText(text).width <= maxW) break;
-      size -= 2;
-    } while (size > 20);
-    return size;
-  }
-
-  function wrap(ctx, text, maxW) {
-    var words = text.split(' '), lines = [], line = '';
-    for (var i = 0; i < words.length; i++) {
-      var test = line ? line + ' ' + words[i] : words[i];
-      if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = words[i]; }
-      else { line = test; }
-    }
-    if (line) lines.push(line);
-    return lines;
-  }
-
-  function makeTexture(card, index) {
-    var c = document.createElement('canvas');
-    c.width = TEX_W; c.height = TEX_H;
-    var ctx = c.getContext('2d');
-    var M = 64, maxW = TEX_W - M * 2;
-
-    // Exercise number, pink plate.
-    ctx.fillStyle = PLATE_PINK;
-    ctx.font = 'bold 34px "Courier New", monospace';
-    ctx.textBaseline = 'alphabetic';
-    ctx.fillText(('0' + (index + 1)).slice(-2), M, 60);
-
-    // What the learner said — teal plate, Times, struck through in pink.
-    var ws = fitFont(ctx, card.wrong, 'italic', '"Times New Roman", Times, serif', 62, maxW);
-    ctx.fillStyle = PLATE_TEAL;
-    ctx.fillText(card.wrong, M, 156);
-    var wWidth = ctx.measureText(card.wrong).width;
-
-    ctx.strokeStyle = PLATE_PINK;
-    ctx.lineWidth = 7;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(M - 8, 140);
-    ctx.quadraticCurveTo(M + wWidth * 0.5, 130 + (index % 2 ? 9 : -6), M + wWidth + 10, 137);
-    ctx.stroke();
-
-    // The correction — black plate, Helvetica, the loudest thing on the card.
-    var rs = fitFont(ctx, card.right, 'bold', 'Helvetica, Arial, sans-serif', 78, maxW);
-    ctx.fillStyle = PLATE_BLACK;
-    ctx.fillText(card.right, M, 156 + rs + 40);
-
-    // Why — teal plate, Courier, wrapped.
-    ctx.font = '27px "Courier New", Courier, monospace';
-    ctx.fillStyle = PLATE_TEAL;
-    var lines = wrap(ctx, card.why, maxW);
-    var y = 156 + rs + 118;
-    for (var i = 0; i < lines.length && i < 3; i++) {
-      ctx.fillText(lines[i], M, y + i * 38);
-    }
-
-    // Underline beneath the correction, black plate.
-    ctx.strokeStyle = PLATE_BLACK;
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(M, 156 + rs + 58);
-    ctx.lineTo(M + Math.min(maxW, 320), 156 + rs + 58 + (index % 2 ? 4 : -3));
-    ctx.stroke();
-
-    var tex = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
-    gl.generateMipmap(gl.TEXTURE_2D);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    return tex;
-  }
-
-  var textures = CARDS.map(makeTexture);
-
-  /* ── Matrices ───────────────────────────────────────────────── */
-
-  function perspective(fovy, aspect, near, far) {
-    var f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
-    return [f / aspect, 0, 0, 0,
-            0, f, 0, 0,
-            0, 0, (far + near) * nf, -1,
-            0, 0, 2 * far * near * nf, 0];
-  }
-  function multiply(a, b) {
-    var o = new Array(16);
-    for (var c = 0; c < 4; c++) {
-      for (var r = 0; r < 4; r++) {
-        o[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] +
-                       a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
-      }
-    }
-    return o;
-  }
-  function translate(x, y, z) {
-    return [1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1];
-  }
-  function rotateY(t) {
-    var c = Math.cos(t), s = Math.sin(t);
-    return [c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1];
-  }
-  function rotateZ(t) {
-    var c = Math.cos(t), s = Math.sin(t);
-    return [c,s,0,0, -s,c,0,0, 0,0,1,0, 0,0,0,1];
-  }
-  function scale(x, y) {
-    return [x,0,0,0, 0,y,0,0, 0,0,1,0, 0,0,0,1];
-  }
-  function smoothstep(e0, e1, x) {
-    var t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
-    return t * t * (3 - 2 * t);
-  }
-
-  /* ── Framebuffer ────────────────────────────────────────────── */
-
-  var fbo = gl.createFramebuffer();
-  var sceneTex = gl.createTexture();
-  var fbW = 0, fbH = 0;
-
-  function resizeTarget(w, h) {
-    if (w === fbW && h === fbH) return;
-    fbW = w; fbH = h;
-    gl.bindTexture(gl.TEXTURE_2D, sceneTex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, sceneTex, 0);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  }
-
-  var W = 0, H = 0;
-  function resize() {
-    var dpr = Math.min(window.devicePixelRatio || 1, 1.75);
-    var w = Math.max(1, Math.round(canvas.clientWidth * dpr));
-    var h = Math.max(1, Math.round(canvas.clientHeight * dpr));
-    if (w === W && h === H) return;
-    W = w; H = h;
-    canvas.width = w; canvas.height = h;
-    resizeTarget(w, h);
-  }
-
-  /* ── Interaction ────────────────────────────────────────────── */
-
-  var spin = 0, velocity = 0, dragging = false, lastX = 0, scrollSpin = 0;
-
-  function pointerDown(e) {
-    dragging = true;
-    lastX = (e.touches ? e.touches[0].clientX : e.clientX);
-    velocity = 0;
-  }
-  function pointerMove(e) {
-    if (!dragging) return;
-    var x = (e.touches ? e.touches[0].clientX : e.clientX);
-    var dx = x - lastX;
-    lastX = x;
-    velocity = -dx * 0.0055;
-    spin += velocity;
-  }
-  function pointerUp() { dragging = false; }
-
-  canvas.addEventListener('mousedown', pointerDown);
-  window.addEventListener('mousemove', pointerMove);
-  window.addEventListener('mouseup', pointerUp);
-  canvas.addEventListener('touchstart', pointerDown, { passive: true });
-  canvas.addEventListener('touchmove', pointerMove, { passive: true });
-  canvas.addEventListener('touchend', pointerUp);
-
-  window.addEventListener('scroll', function () {
-    scrollSpin = window.scrollY * 0.0022;
-  }, { passive: true });
-
-  /* ── Draw, stepped to 12 fps ────────────────────────────────── */
-
-  var STEP = 1 / 12;
-  var N = CARDS.length;
-  var RADIUS = 3.6;
-  var CAM_Z = 7.6;
-  var HALF_FOV_TAN = Math.tan(Math.PI / 8);   // 45deg fov
-  var OFF_X = 1.25, OFF_Y = 0.25;   // ring sits up and to the right of the masthead
-  var lastStep = -1;
-
   var reduce = window.matchMedia &&
                window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  function frame(now) {
-    requestAnimationFrame(frame);
+  /* ══════════════════════════════════════════════════════════════
+     1. The grammar engine, ported from grammar_engine.dart
 
-    var stepped = Math.floor((now / 1000) / STEP);
-    if (stepped === lastStep) return;   // hold the frame — stop-motion, not smooth
-    lastStep = stepped;
-    var t = stepped * STEP;
+     Same patterns, same explanations, same order. `analyse` keeps the
+     Dart version's semantics: rules match against the original text so
+     offsets stay meaningful, a span already claimed by an earlier rule
+     is skipped, and the corrected string is built cumulatively.
+     ══════════════════════════════════════════════════════════════ */
 
-    resize();
+  var IRREGULAR_3P = { go:'goes', do:'does', have:'has', be:'is', say:'says' };
 
-    if (!dragging) {
-      spin += reduce ? 0 : 0.010;
-      spin += velocity;
-      velocity *= 0.94;
+  function thirdPerson(verb) {
+    var v = verb.toLowerCase();
+    if (IRREGULAR_3P[v]) return IRREGULAR_3P[v];
+    if (v.length > 1 && v.slice(-1) === 'y' && 'aeiou'.indexOf(v.slice(-2, -1)) === -1) {
+      return v.slice(0, -1) + 'ies';
     }
-
-    // ── Pass 1: ink plates into the framebuffer ──
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-    gl.viewport(0, 0, W, H);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.ONE, gl.ONE);   // overprinting: coverage adds
-    gl.disable(gl.DEPTH_TEST);
-
-    gl.useProgram(cardProg);
-    gl.bindVertexArray(quad);
-
-    var aspect = W / H;
-    var proj = perspective(Math.PI / 4, aspect, 0.1, 40);
-    var view = translate(0, 0, -CAM_Z);
-    var vp = multiply(proj, view);
-    gl.uniformMatrix4fv(uProj, false, new Float32Array(vp));
-    gl.uniform1i(uTex, 0);
-    gl.activeTexture(gl.TEXTURE0);
-
-    // Size the card off the frustum at the front of the ring, so a portrait
-    // phone gets a card that fits its width instead of one cropped by it.
-    var halfWView = (CAM_Z - RADIUS) * HALF_FOV_TAN * aspect;
-    var portrait  = aspect < 1.0;
-    var cardW = Math.min(2.30, halfWView * 1.88);
-    var cardH = cardW * (TEX_H / TEX_W);
-    var ox = portrait ? 0 : OFF_X;
-    var oy = portrait ? 0.85 : OFF_Y;
-    // A full-width portrait card cannot share the stage with its neighbours,
-    // so portrait snaps the ring to whole card positions and prints one at a
-    // time — a slide advancing, rather than a carousel sliding.
-    var fadeLo = portrait ? 0.93 : 0.62;
-    var fadeHi = portrait ? 0.999 : 0.95;
-    var stepAngle = Math.PI * 2 / N;
-    var ring = spin + scrollSpin;
-    if (portrait) ring = Math.round(ring / stepAngle) * stepAngle;
-
-    for (var i = 0; i < N; i++) {
-      var a = ring + (i / N) * Math.PI * 2;
-      var ca = Math.cos(a), sa = Math.sin(a);
-      // Only the leading two or three cards print; the rest of the ring is
-      // off-press. Keeps the deck legible instead of a wall of overprint.
-      var fade = smoothstep(fadeLo, fadeHi, ca);
-      if (fade <= 0.01) continue;
-
-      // Off-grid tilt, deterministic per card.
-      var tilt = ((i * 37 % 11) - 5) * 0.013;
-      var lift = Math.sin(i * 2.4) * (portrait ? 0.18 : 0.52);
-      var pop  = 1 + Math.max(0, ca) * 0.08;
-
-      var m = multiply(translate(sa * RADIUS + ox, lift + oy, ca * RADIUS), rotateY(a));
-      m = multiply(m, rotateZ(tilt));
-      m = multiply(m, scale(cardW * pop, cardH * pop));
-
-      gl.uniformMatrix4fv(uModel, false, new Float32Array(m));
-      gl.uniform1f(uFade, fade);
-      gl.bindTexture(gl.TEXTURE_2D, textures[i]);
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    }
-
-    // ── Pass 2: screen the plates onto paper ──
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, W, H);
-    gl.disable(gl.BLEND);
-    gl.useProgram(postProg);
-    gl.bindVertexArray(fsQuad);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, sceneTex);
-    gl.uniform1i(uScene, 0);
-    gl.uniform2f(uRes, W, H);
-    gl.uniform1f(uTimeP, t);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    if (/(s|x|z|ch|sh|o)$/.test(v)) return v + 'es';
+    return v + 's';
   }
 
-  requestAnimationFrame(frame);
+  var IRREGULAR_BASE = {
+    went:'go', came:'come', saw:'see', ate:'eat', took:'take', got:'get',
+    made:'make', gave:'give', knew:'know', thought:'think', told:'tell',
+    felt:'feel', found:'find'
+  };
+
+  function baseForm(verb) {
+    var v = verb.toLowerCase();
+    if (IRREGULAR_BASE[v]) return IRREGULAR_BASE[v];
+    if (/ied$/.test(v)) return v.slice(0, -3) + 'y';
+    if (/ed$/.test(v)) {
+      var stem = v.slice(0, -2);
+      // "stopped" -> "stop": undo the doubled final consonant.
+      if (stem.length > 2 && stem.slice(-1) === stem.slice(-2, -1) &&
+          'aeiou'.indexOf(stem.slice(-1)) === -1) {
+        return stem.slice(0, -1);
+      }
+      return stem;
+    }
+    return v;
+  }
+
+  var NEG_SWAP = { nothing:'anything', nobody:'anybody', nowhere:'anywhere', 'no one':'anyone' };
+
+  // type: 'grammar' | 'vocabulary' | 'phrasing'
+  var RULES = [
+    // ── Subject-verb agreement ──
+    { re:/\b(he|she|it)\s+(go|do|have|make|take|say|come|get|know|want|like|need|work|play|study|watch|live|speak|eat|read|write|run|talk|walk|help|look|feel|think)\b/gi,
+      why:'With he / she / it in the simple present, the verb takes -s.',
+      fix:function(m){ return m[1] + ' ' + thirdPerson(m[2]); } },
+    { re:/\b(he|she|it)\s+(are|were)\b/gi,
+      why:'Use "is" (or "was") with he, she and it.',
+      fix:function(m){ return m[1] + ' ' + (m[2].toLowerCase() === 'are' ? 'is' : 'was'); } },
+    { re:/\b(they|we|you)\s+(is|was)\b/gi,
+      why:'Plural subjects take "are" (or "were").',
+      fix:function(m){ return m[1] + ' ' + (m[2].toLowerCase() === 'is' ? 'are' : 'were'); } },
+    { re:/\bI\s+(is|are|am\s+be)\b/g,
+      why:'The correct form is "I am".',
+      fix:function(){ return 'I am'; } },
+
+    // ── Tense ──
+    { re:/\b(did|didn't|did\s+not)\s+(?:(i|you|he|she|it|we|they)\s+)?(\w+ed|went|came|saw|ate|took|got|made|gave|knew|thought|told|felt|found)\b/gi,
+      why:'"Did" already marks the past, so the next verb stays in its base form.',
+      fix:function(m){ return m[1] + ' ' + (m[2] ? m[2] + ' ' : '') + baseForm(m[3]); } },
+    { re:/\b(have|has)\s+went\b/gi,
+      why:'The past participle of "go" is "gone": I have gone.',
+      fix:function(m){ return m[1] + ' gone'; } },
+    { re:/\bsince\s+(\d+|a few|many|some)\s+(year|month|week|day|hour)s?\b/gi,
+      why:'Use "for" with a length of time and "since" with a starting point: for two years, since 2022.',
+      fix:function(m){ return 'for ' + m[1] + ' ' + m[2] + 's'; } },
+
+    // ── Articles ──
+    { re:/\ba\s+(apple|hour|elephant|umbrella|orange|egg|idea|honest|answer|engineer|exam|email|interview|opportunity)\b/gi,
+      why:'Use "an" before a vowel sound.',
+      fix:function(m){ return 'an ' + m[1]; } },
+    { re:/\ban\s+(university|user|European|one|uniform)\b/gi,
+      why:'Use "a" when the next word starts with a consonant *sound* — "university" begins with a "yoo" sound.',
+      fix:function(m){ return 'a ' + m[1]; } },
+
+    // ── Countability ──
+    { re:/\b(informations|advices|equipments|furnitures|luggages|homeworks|softwares|feedbacks)\b/gi,
+      why:'This is an uncountable noun in English — it has no plural form.',
+      fix:function(m){ return m[1].slice(0, -1); } },
+    { re:/\bpeoples\b/gi,
+      why:'"People" is already plural.',
+      fix:function(){ return 'people'; } },
+
+    // ── Comparatives ──
+    { re:/\bmore\s+(better|easier|faster|bigger|higher|worse|nicer)\b/gi,
+      why:'Do not use "more" with a word that is already comparative.',
+      fix:function(m){ return m[1]; } },
+    { re:/\bmost\s+(easiest|best|fastest|biggest|worst)\b/gi,
+      why:'Do not use "most" with a word that is already superlative.',
+      fix:function(m){ return m[1]; } },
+
+    // ── Prepositions & fixed expressions ──
+    { re:/\bdiscuss\s+about\b/gi, type:'phrasing',
+      why:'"Discuss" already means "talk about" — drop the "about".',
+      fix:function(){ return 'discuss'; } },
+    { re:/\bI\s+am\s+agree\b/gi,
+      why:'"Agree" is a verb on its own: I agree.',
+      fix:function(){ return 'I agree'; } },
+    { re:/\breturn\s+back\b|\brevert\s+back\b|\brepeat\s+again\b/gi, type:'phrasing',
+      why:'The "back" / "again" is already contained in the verb.',
+      fix:function(m){ return m[0].split(/\s+/)[0]; } },
+    { re:/\bcousin\s+(brother|sister)\b/gi, type:'vocabulary',
+      why:'In English, "cousin" works for any gender on its own.',
+      fix:function(){ return 'cousin'; } },
+    { re:/\bout\s+of\s+station\b/gi, type:'vocabulary',
+      why:'Native speakers say "out of town".',
+      fix:function(){ return 'out of town'; } },
+    { re:/\bdo\s+the\s+needful\b/gi, type:'phrasing',
+      why:'Say specifically what you need — e.g. "please take a look".',
+      fix:function(){ return 'take care of it'; } },
+    { re:/\bwhat\s+is\s+your\s+good\s+name\b/gi, type:'phrasing',
+      why:'Just "What’s your name?" — adding "good" sounds unusual in English.',
+      fix:function(){ return "what's your name"; } },
+    { re:/\bI\s+am\s+having\s+(a|an|two|three|some)?\s*(brothers?|sisters?|cars?|house|phone|questions?|idea)\b/gi,
+      why:'For things you own or relationships, use "I have" — not "I am having". "Having" is for actions, like having lunch.',
+      fix:function(m){ return 'I have ' + (m[1] || 'a') + ' ' + m[2]; } },
+    // Scoped tightly: "I have a doubt" is the pattern to fix, while
+    // "I doubt it" is perfectly correct English and must not be flagged.
+    { re:/\b(a|any|one|my|some)\s+doubts?\b/gi, type:'vocabulary',
+      why:'For a question in class or a meeting, English uses "question". "Doubt" means you do not believe something.',
+      fix:function(m){ return m[1] + ' question'; } },
+
+    // ── Adverb form ──
+    { re:/\beveryday\b(?=\s*(?:[.!?,;]|$|at\b|in\b|on\b|after\b|before\b|with\b|and\b|but\b|so\b|because\b))/gi,
+      why:'"Everyday" (one word) is an adjective, as in "everyday English". When you mean "each day", write two words: every day.',
+      fix:function(){ return 'every day'; } },
+
+    // ── Double negative ──
+    { re:/\b(don't|doesn't|didn't|can't|won't)\s+(\w+\s+)?(nothing|nobody|nowhere|no one)\b/gi,
+      why:'English uses one negative per clause — "anything" instead of "nothing" after a negative verb.',
+      fix:function(m){ return m[1] + ' ' + (m[2] || '') + NEG_SWAP[m[3].toLowerCase()]; } }
+  ];
+
+  function matchCase(original, replacement) {
+    if (!original || !replacement) return replacement;
+    var c = original.charAt(0);
+    if (c !== c.toUpperCase() || c === c.toLowerCase()) return replacement;
+    return replacement.charAt(0).toUpperCase() + replacement.slice(1);
+  }
+
+  function capitalise(s) {
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+  }
+
+  function analyse(text) {
+    if (!text.trim()) return null;
+
+    var hits = [], claimed = [], corrected = text, i, m;
+
+    for (i = 0; i < RULES.length; i++) {
+      var rule = RULES[i];
+      rule.re.lastIndex = 0;
+      while ((m = rule.re.exec(text)) !== null) {
+        if (m[0] === '') { rule.re.lastIndex++; continue; }
+        var start = m.index, end = m.index + m[0].length;
+
+        var overlaps = claimed.some(function (c) { return start < c[1] && c[0] < end; });
+        if (overlaps) continue;
+
+        var fixed = matchCase(m[0], rule.fix(m));
+        if (fixed.toLowerCase() === m[0].toLowerCase()) continue;
+
+        claimed.push([start, end]);
+        corrected = corrected.replace(m[0], fixed);
+        hits.push({ why: rule.why, type: rule.type || 'grammar' });
+      }
+    }
+
+    if (!hits.length) return { clean: true, before: capitalise(text.trim()) };
+    return {
+      clean: false,
+      before: capitalise(text.trim()),
+      after: capitalise(corrected.trim()),
+      hits: hits
+    };
+  }
+
+  /* ── Word-level diff, so the change is visible rather than described ── */
+
+  function diff(a, b) {
+    var A = a.split(/(\s+)/), B = b.split(/(\s+)/);
+    var n = A.length, mLen = B.length, i, j;
+    var lcs = [];
+    for (i = 0; i <= n; i++) lcs.push(new Array(mLen + 1).fill(0));
+    for (i = n - 1; i >= 0; i--) {
+      for (j = mLen - 1; j >= 0; j--) {
+        lcs[i][j] = A[i] === B[j] ? lcs[i + 1][j + 1] + 1
+                                  : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+      }
+    }
+    var out = [];
+    i = 0; j = 0;
+    while (i < n && j < mLen) {
+      if (A[i] === B[j]) { out.push(['=', A[i]]); i++; j++; }
+      else if (lcs[i + 1][j] >= lcs[i][j + 1]) { out.push(['-', A[i]]); i++; }
+      else { out.push(['+', B[j]]); j++; }
+    }
+    while (i < n) out.push(['-', A[i++]]);
+    while (j < mLen) out.push(['+', B[j++]]);
+    return out;
+  }
+
+  function esc(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /* ── Corrector UI ────────────────────────────────────────────── */
+
+  var input = document.getElementById('input');
+  var result = document.getElementById('result');
+  var chipBar = document.getElementById('chips');
+
+  var EXAMPLES = [
+    'Did you went there?',
+    'He go to work everyday.',
+    'I have a doubt about the plan.',
+    'Let us discuss about the informations.',
+    'I am out of station, please revert back.',
+    'I doubt it will rain.'
+  ];
+
+  EXAMPLES.forEach(function (ex) {
+    var b = document.createElement('button');
+    b.className = 'chip';
+    b.type = 'button';
+    b.textContent = ex;
+    b.addEventListener('click', function () { input.value = ex; render(); input.focus(); });
+    chipBar.appendChild(b);
+  });
+
+  function render() {
+    var r = analyse(input.value);
+
+    if (!r) { result.innerHTML = ''; return; }
+
+    if (r.clean) {
+      result.innerHTML =
+        '<p class="result__clean"><b>No mistakes found.</b> ' +
+        'This sentence is left exactly as written.</p>';
+      return;
+    }
+
+    var html = '<p class="result__line">';
+    diff(r.before, r.after).forEach(function (part) {
+      var t = esc(part[1]);
+      if (part[0] === '=') html += t;
+      else if (part[0] === '-') html += '<del>' + t + '</del>';
+      else html += '<ins>' + t + '</ins>';
+    });
+    html += '</p><ul class="result__why">';
+
+    r.hits.forEach(function (h, i) {
+      html += '<li style="animation-delay:' + (i * 70) + 'ms">' +
+              '<span class="pill pill--' + h.type + '">' + h.type + '</span>' +
+              '<span>' + esc(h.why) + '</span></li>';
+    });
+    result.innerHTML = html + '</ul>';
+  }
+
+  input.addEventListener('input', render);
+  render();
+
+  /* ══════════════════════════════════════════════════════════════
+     2. The hero object, in three.js
+
+     The app's splash orb, promoted to 3D: a noise-displaced sphere
+     lit only by its own fresnel rim in the brand ramp, inside a
+     counter-rotating wireframe shell, inside a drifting particle
+     field. No lights and no post-processing — the glow is all in the
+     shaders, which is what keeps it cheap enough to hold 60fps.
+     ══════════════════════════════════════════════════════════════ */
+
+  var canvas = document.getElementById('scene');
+
+  if (typeof THREE === 'undefined' || !canvas) return;
+
+  var renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+  } catch (e) {
+    return;   // No WebGL: the page keeps its gradients and reads fine.
+  }
+
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.set(0, 0, 5.2);
+
+  var group = new THREE.Group();
+  scene.add(group);
+
+  // Simplex noise (Ashima / webgl-noise, MIT) — used for the displacement.
+  var NOISE = [
+    'vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}',
+    'vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}',
+    'vec4 permute(vec4 x){return mod289(((x*34.0)+1.0)*x);}',
+    'vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-0.85373472095314*r;}',
+    'float snoise(vec3 v){',
+    '  const vec2 C=vec2(1.0/6.0,1.0/3.0); const vec4 D=vec4(0.0,0.5,1.0,2.0);',
+    '  vec3 i=floor(v+dot(v,C.yyy)); vec3 x0=v-i+dot(i,C.xxx);',
+    '  vec3 g=step(x0.yzx,x0.xyz); vec3 l=1.0-g;',
+    '  vec3 i1=min(g.xyz,l.zxy); vec3 i2=max(g.xyz,l.zxy);',
+    '  vec3 x1=x0-i1+C.xxx; vec3 x2=x0-i2+C.yyy; vec3 x3=x0-D.yyy;',
+    '  i=mod289(i);',
+    '  vec4 p=permute(permute(permute(i.z+vec4(0.0,i1.z,i2.z,1.0))',
+    '        +i.y+vec4(0.0,i1.y,i2.y,1.0))+i.x+vec4(0.0,i1.x,i2.x,1.0));',
+    '  float n_=0.142857142857; vec3 ns=n_*D.wyz-D.xzx;',
+    '  vec4 j=p-49.0*floor(p*ns.z*ns.z);',
+    '  vec4 x_=floor(j*ns.z); vec4 y_=floor(j-7.0*x_);',
+    '  vec4 x=x_*ns.x+ns.yyyy; vec4 y=y_*ns.x+ns.yyyy; vec4 h=1.0-abs(x)-abs(y);',
+    '  vec4 b0=vec4(x.xy,y.xy); vec4 b1=vec4(x.zw,y.zw);',
+    '  vec4 s0=floor(b0)*2.0+1.0; vec4 s1=floor(b1)*2.0+1.0; vec4 sh=-step(h,vec4(0.0));',
+    '  vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy; vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;',
+    '  vec3 p0=vec3(a0.xy,h.x); vec3 p1=vec3(a0.zw,h.y);',
+    '  vec3 p2=vec3(a1.xy,h.z); vec3 p3=vec3(a1.zw,h.w);',
+    '  vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));',
+    '  p0*=norm.x; p1*=norm.y; p2*=norm.z; p3*=norm.w;',
+    '  vec4 m=max(0.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.0); m=m*m;',
+    '  return 42.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));',
+    '}'
+  ].join('\n');
+
+  var CYAN   = new THREE.Color(0x22D8F0);
+  var BLUE   = new THREE.Color(0x3B7BFF);
+  var VIOLET = new THREE.Color(0x8B5CF6);
+  var MAGENTA= new THREE.Color(0xEC4899);
+
+  var uniforms = {
+    uTime:   { value: 0 },
+    uCyan:   { value: CYAN },
+    uBlue:   { value: BLUE },
+    uViolet: { value: VIOLET },
+    uMagenta:{ value: MAGENTA },
+    uPulse:  { value: 0 }
+  };
+
+  var core = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(1, 48),
+    new THREE.ShaderMaterial({
+      uniforms: uniforms,
+      transparent: true,
+      vertexShader: NOISE + [
+        'uniform float uTime;',
+        'uniform float uPulse;',
+        'varying vec3 vNormal;',
+        'varying vec3 vView;',
+        'varying float vD;',
+        'void main(){',
+        // Two octaves of drifting noise: a slow swell plus surface detail.
+        '  float n  = snoise(normal * 1.35 + vec3(0.0, 0.0, uTime * 0.22));',
+        '  float n2 = snoise(normal * 3.10 - vec3(0.0, uTime * 0.16, 0.0));',
+        '  float d  = n * 0.16 + n2 * 0.055 + uPulse * 0.05;',
+        '  vD = n * 0.5 + 0.5;',
+        '  vec3 pos = position + normal * d;',
+        '  vec4 world = modelMatrix * vec4(pos, 1.0);',
+        '  vNormal = normalize(mat3(modelMatrix) * normal);',
+        '  vView   = normalize(cameraPosition - world.xyz);',
+        '  gl_Position = projectionMatrix * viewMatrix * world;',
+        '}'
+      ].join('\n'),
+      fragmentShader: [
+        'uniform vec3 uCyan; uniform vec3 uBlue; uniform vec3 uViolet; uniform vec3 uMagenta;',
+        'uniform float uTime;',
+        'varying vec3 vNormal; varying vec3 vView; varying float vD;',
+        'void main(){',
+        // Ramp along the displacement, then blow out the grazing edge.
+        '  float t = clamp(vD + sin(uTime * 0.4) * 0.08, 0.0, 1.0);',
+        '  vec3 base = mix(uCyan, uBlue, smoothstep(0.0, 0.5, t));',
+        '  base = mix(base, uViolet, smoothstep(0.45, 0.85, t));',
+        '  base = mix(base, uMagenta, smoothstep(0.82, 1.0, t));',
+        '  float fres = pow(1.0 - max(dot(normalize(vNormal), normalize(vView)), 0.0), 2.6);',
+        '  vec3 col = base * (0.16 + fres * 1.9);',
+        '  gl_FragColor = vec4(col, 0.30 + fres * 0.70);',
+        '}'
+      ].join('\n')
+    })
+  );
+  group.add(core);
+
+  // Outer halo: a back-faced sphere that is pure fresnel, so it reads as bloom.
+  var halo = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(1.62, 5),
+    new THREE.ShaderMaterial({
+      uniforms: uniforms,
+      transparent: true,
+      side: THREE.BackSide,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      vertexShader: [
+        'varying vec3 vNormal; varying vec3 vView;',
+        'void main(){',
+        '  vec4 world = modelMatrix * vec4(position, 1.0);',
+        '  vNormal = normalize(mat3(modelMatrix) * normal);',
+        '  vView   = normalize(cameraPosition - world.xyz);',
+        '  gl_Position = projectionMatrix * viewMatrix * world;',
+        '}'
+      ].join('\n'),
+      fragmentShader: [
+        'uniform vec3 uBlue; uniform vec3 uViolet;',
+        'varying vec3 vNormal; varying vec3 vView;',
+        'void main(){',
+        '  float f = pow(1.0 - abs(dot(normalize(vNormal), normalize(vView))), 3.4);',
+        '  gl_FragColor = vec4(mix(uBlue, uViolet, 0.5) * f * 1.5, f * 0.55);',
+        '}'
+      ].join('\n')
+    })
+  );
+  group.add(halo);
+
+  // Counter-rotating wireframe shell.
+  var shell = new THREE.LineSegments(
+    new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(1.42, 2)),
+    new THREE.LineBasicMaterial({
+      color: 0x6E8BFF, transparent: true, opacity: 0.22,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    })
+  );
+  group.add(shell);
+
+  // Particle field: a shell plus a flat ring, so it reads as orbit not fog.
+  var COUNT = 1400;
+  var pos = new Float32Array(COUNT * 3);
+  var seed = new Float32Array(COUNT);
+  for (var p = 0; p < COUNT; p++) {
+    var ring = p % 3 === 0;
+    var theta = Math.random() * Math.PI * 2;
+    var r, y;
+    if (ring) {
+      r = 2.05 + Math.random() * 0.55;
+      y = (Math.random() - 0.5) * 0.10;
+    } else {
+      var phi = Math.acos(2 * Math.random() - 1);
+      r = 1.85 + Math.random() * 1.5;
+      y = Math.cos(phi) * r;
+      r = Math.sin(phi) * r;
+    }
+    pos[p * 3]     = Math.cos(theta) * r;
+    pos[p * 3 + 1] = y;
+    pos[p * 3 + 2] = Math.sin(theta) * r;
+    seed[p] = Math.random();
+  }
+  var pGeo = new THREE.BufferGeometry();
+  pGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  pGeo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
+
+  var particles = new THREE.Points(pGeo, new THREE.ShaderMaterial({
+    uniforms: uniforms,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    vertexShader: [
+      'attribute float aSeed;',
+      'uniform float uTime;',
+      'varying float vTw;',
+      'void main(){',
+      '  vec3 p = position;',
+      '  p.y += sin(uTime * 0.5 + aSeed * 6.28) * 0.07;',
+      '  vec4 mv = modelViewMatrix * vec4(p, 1.0);',
+      '  vTw = 0.45 + 0.55 * sin(uTime * 1.4 + aSeed * 12.0);',
+      '  gl_PointSize = (1.0 + aSeed * 2.2) * (34.0 / -mv.z);',
+      '  gl_Position = projectionMatrix * mv;',
+      '}'
+    ].join('\n'),
+    fragmentShader: [
+      'uniform vec3 uCyan; uniform vec3 uViolet;',
+      'varying float vTw;',
+      'void main(){',
+      '  float d = length(gl_PointCoord - 0.5);',
+      '  if (d > 0.5) discard;',
+      '  float a = smoothstep(0.5, 0.0, d) * vTw;',
+      '  gl_FragColor = vec4(mix(uCyan, uViolet, vTw) * a, a * 0.75);',
+      '}'
+    ].join('\n')
+  }));
+  group.add(particles);
+
+  /* ── Drive it ───────────────────────────────────────────────── */
+
+  var pointer = { x: 0, y: 0 };
+  var smooth  = { x: 0, y: 0 };
+  var scrollY = 0, scrollSmooth = 0;
+
+  window.addEventListener('pointermove', function (e) {
+    pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+    pointer.y = (e.clientY / window.innerHeight) * 2 - 1;
+  }, { passive: true });
+
+  window.addEventListener('scroll', function () { scrollY = window.scrollY; }, { passive: true });
+
+  function layout() {
+    var w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+
+    // Portrait puts the orb above the copy; landscape puts it beside it.
+    if (w / h < 0.95) {
+      group.position.set(0, 1.15, 0);
+      group.scale.setScalar(0.72);
+    } else {
+      group.position.set(1.62, 0.12, 0);
+      group.scale.setScalar(1);
+    }
+  }
+  layout();
+  window.addEventListener('resize', layout);
+
+  var blooms = Array.prototype.slice.call(document.querySelectorAll('.bloom'));
+  var clock = new THREE.Clock();
+
+  function tick() {
+    requestAnimationFrame(tick);
+
+    var t = clock.getElapsedTime();
+    uniforms.uTime.value = t;
+
+    // Lerp everything so input reads as spring rather than snap.
+    smooth.x += (pointer.x - smooth.x) * 0.045;
+    smooth.y += (pointer.y - smooth.y) * 0.045;
+    scrollSmooth += (scrollY - scrollSmooth) * 0.08;
+
+    if (!reduce) {
+      group.rotation.y += 0.0022;
+      shell.rotation.y -= 0.0055;
+      shell.rotation.x += 0.0016;
+      particles.rotation.y += 0.0009;
+      uniforms.uPulse.value = Math.sin(t * 0.9) * 0.5 + 0.5;
+    }
+
+    // Mouse parallax on the object, scroll parallax on the camera.
+    group.rotation.x = smooth.y * 0.30;
+    group.rotation.z = smooth.x * 0.10;
+    camera.position.x = smooth.x * 0.42;
+    camera.position.y = -smooth.y * 0.30 - scrollSmooth * 0.0016;
+    camera.lookAt(group.position.x * 0.35, group.position.y * 0.35, 0);
+
+    // The orb recedes as the page scrolls past the hero.
+    var vh = window.innerHeight;
+    var away = Math.min(scrollSmooth / vh, 1);
+    group.scale.setScalar((window.innerWidth / window.innerHeight < 0.95 ? 0.72 : 1) * (1 - away * 0.35));
+    canvas.style.opacity = String(Math.max(0, 1 - away * 1.15));
+
+    // The CSS blooms drift at their own depths.
+    for (var i = 0; i < blooms.length; i++) {
+      var d = parseFloat(blooms[i].dataset.depth);
+      blooms[i].style.transform =
+        'translate3d(' + (smooth.x * d * 90) + 'px,' +
+        (-scrollSmooth * d - smooth.y * d * 60) + 'px,0)';
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  requestAnimationFrame(tick);
+  requestAnimationFrame(function () { canvas.classList.add('ready'); });
+
+  /* ══════════════════════════════════════════════════════════════
+     3. Micro-animations
+     ══════════════════════════════════════════════════════════════ */
+
+  // Reveal on enter.
+  var reveals = document.querySelectorAll('.reveal');
+  if ('IntersectionObserver' in window && !reduce) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+      });
+    }, { rootMargin: '0px 0px -12% 0px', threshold: 0.08 });
+    Array.prototype.forEach.call(reveals, function (el, i) {
+      el.style.transitionDelay = (Math.min(i, 6) * 55) + 'ms';
+      io.observe(el);
+    });
+  } else {
+    Array.prototype.forEach.call(reveals, function (el) { el.classList.add('in'); });
+  }
+
+  // Pointer-tracked tilt on the glass cards.
+  if (!reduce && window.matchMedia('(hover: hover)').matches) {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-tilt]'), function (card) {
+      card.addEventListener('pointermove', function (e) {
+        var r = card.getBoundingClientRect();
+        var x = (e.clientX - r.left) / r.width - 0.5;
+        var y = (e.clientY - r.top) / r.height - 0.5;
+        card.style.transform =
+          'translateY(-6px) perspective(900px) rotateX(' + (-y * 7) + 'deg) rotateY(' + (x * 9) + 'deg)';
+      });
+      card.addEventListener('pointerleave', function () { card.style.transform = ''; });
+    });
+  }
 })();
 </script>
 </body>
