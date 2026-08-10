@@ -183,13 +183,34 @@ section{
 .btn.is-locked:hover{transform:none}
 
 /* ── Hero ───────────────────────────────────────────────────── */
-.hero{min-height:100svh; display:flex; align-items:center; padding-top:7rem; padding-bottom:4rem}
-.hero__inner{width:100%; max-width:40rem}
+.hero{
+  min-height:100svh;
+  display:grid;
+  grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);
+  gap:1.5rem;
+  align-items:stretch;
+  padding-top:7.5rem; padding-bottom:3.5rem;
+}
+/* The right column is deliberately empty — it is the orb's room. */
+.hero__orb{position:relative}
+/* auto margins top and bottom distribute the block down the full column, so
+   the hero fills its height rather than leaving a gap under the buttons. */
+.hero__inner{
+  display:flex; flex-direction:column;
+  width:100%; max-width:36rem;
+}
+.hero__inner .eyebrow{margin-top:auto}
+.hero__meta{margin-top:auto}
+@media (max-width:900px){
+  .hero{grid-template-columns:1fr; padding-top:6.5rem}
+  .hero__orb{order:-1; min-height:34svh}
+  .hero__inner{max-width:none}
+}
 .hero__sub{font-size:clamp(1.02rem,1.6vw,1.28rem); color:var(--text-2); max-width:36ch; margin:1.4rem 0 2rem}
 .hero__sub em{color:var(--text); font-style:italic}
 .cta{display:flex; flex-wrap:wrap; gap:.75rem}
 .hero__meta{
-  display:flex; flex-wrap:wrap; gap:.5rem 1.5rem; margin-top:2.4rem;
+  display:flex; flex-wrap:wrap; gap:.5rem 1.5rem; padding-top:2.4rem;
   font-family:var(--mono); font-size:.74rem; color:var(--text-3);
 }
 
@@ -425,6 +446,7 @@ footer a:hover{color:var(--cyan)}
       <span>Works offline</span><span>No ads</span><span>Corrections in real time</span>
     </p>
   </div>
+  <div class="hero__orb" aria-hidden="true"></div>
 </section>
 
 <!-- ══ TRY ════════════════════════════════════════════════════ -->
@@ -1170,6 +1192,11 @@ footer a:hover{color:var(--cyan)}
   }
   document.addEventListener('visibilitychange', function () { hidden = document.hidden; });
 
+  // Where the orb sits in landscape: the centre of the column the hero
+  // layout reserves for it, slightly above the vertical middle.
+  var ORB_X = 1.62, ORB_Y = 0.05;
+  var ORB_SCALE_WIDE = 1.12, ORB_SCALE_TALL = 0.80;
+
   var pointer = { x: 0, y: 0 };
   var smooth  = { x: 0, y: 0 };
   var scrollY = 0, scrollSmooth = 0;
@@ -1189,11 +1216,11 @@ footer a:hover{color:var(--cyan)}
 
     // Portrait puts the orb above the copy; landscape puts it beside it.
     if (w / h < 0.95) {
-      group.position.set(0, 1.15, 0);
-      group.scale.setScalar(0.72);
+      group.position.set(0, 1.30, 0);
+      group.scale.setScalar(ORB_SCALE_TALL);
     } else {
-      group.position.set(1.62, 0.12, 0);
-      group.scale.setScalar(1);
+      group.position.set(ORB_X, ORB_Y, 0);
+      group.scale.setScalar(ORB_SCALE_WIDE);
     }
   }
   layout();
@@ -1232,7 +1259,7 @@ footer a:hover{color:var(--cyan)}
     // The orb recedes as the page scrolls past the hero.
     var vh = window.innerHeight;
     var away = Math.min(scrollSmooth / vh, 1);
-    group.scale.setScalar((window.innerWidth / window.innerHeight < 0.95 ? 0.72 : 1) * (1 - away * 0.35));
+    group.scale.setScalar((window.innerWidth / window.innerHeight < 0.95 ? ORB_SCALE_TALL : ORB_SCALE_WIDE) * (1 - away * 0.35));
     var op = Math.max(0, 1 - away * 1.15);
     if (Math.abs(op - lastOpacity) > 0.01) { canvas.style.opacity = String(op); lastOpacity = op; }
 
@@ -1460,7 +1487,9 @@ footer a:hover{color:var(--cyan)}
     }, { rootMargin: '0px 0px -12% 0px', threshold: 0.08 });
     Array.prototype.forEach.call(reveals, function (el, i) {
       el.style.transitionDelay = (Math.min(i, 6) * 55) + 'ms';
-      io.observe(el);
+      var r = el.getBoundingClientRect();
+      if (r.top < window.innerHeight && r.bottom > 0) el.classList.add('in');
+      else io.observe(el);
     });
   } else {
     Array.prototype.forEach.call(reveals, function (el) { el.classList.add('in'); });
