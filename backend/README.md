@@ -1,7 +1,12 @@
 # Voix backend
 
 A single Cloudflare Worker that holds your OpenAI API key so the app never
-has to.
+has to. It gives the tutor a real brain: it answers what the learner actually
+said, translates, and explains mistakes in their own language.
+
+Speaking and listening stay on the phone — Android's own speech recogniser and
+text-to-speech — so no audio ever reaches this Worker and none of it costs
+anything.
 
 **Why this exists:** an APK is a zip file. A key compiled into the app can be
 extracted in about thirty seconds by anyone who downloads it, and then they are
@@ -59,8 +64,8 @@ Keep that value — you paste it into the app in step 5.
 
 ### 3. Turn on the spending cap
 
-This is the step people skip and regret. Without it, one bug that reconnects in
-a loop can run up a large bill overnight.
+This is the step people skip and regret. Without it, one retry loop in a bad
+build can run up a large bill overnight.
 
 ```bash
 npx wrangler kv namespace create VOIX_KV
@@ -69,9 +74,9 @@ npx wrangler kv namespace create VOIX_KV
 It prints an `id`. Open `wrangler.toml`, uncomment the `[[kv_namespaces]]`
 block, and paste the id in.
 
-### 4. Check the model names, then deploy
+### 4. Check the model name, then deploy
 
-Open `wrangler.toml` and check `REALTIME_MODEL` and `CHAT_MODEL` against
+Open `wrangler.toml` and check `CHAT_MODEL` against
 [OpenAI's current model list](https://platform.openai.com/docs/models). Model
 names change; a stale one fails at runtime with a `400`.
 
@@ -101,57 +106,54 @@ flutter run --dart-define-from-file=env.json
 flutter build appbundle --release --dart-define-from-file=env.json
 ```
 
-Forget the flag and the app simply runs in its free, on-device mode — no crash,
-no error, just the scripted tutor. If live voice is mysteriously missing from
-the Practice screen, this flag is the first thing to check.
+Forget the flag and the app simply runs on the on-device tutor — no crash, no
+error, just the scripted replies. If the tutor seems to have stopped
+understanding you, this flag is the first thing to check.
 
 ### 6. Check it works
 
 ```bash
-curl -X POST https://voix-backend.your-name.workers.dev/v1/session \
+curl -X POST https://voix-backend.your-name.workers.dev/v1/chat \
   -H "Content-Type: application/json" \
   -H "x-voix-app-token: YOUR_APP_TOKEN" \
   -H "x-voix-device: test-device" \
-  -d '{"level":"beginner","nativeLanguage":"Telugu","scenario":"ordering food"}'
+  -d '{"level":"beginner","nativeLanguage":"Telugu","scenario":"ordering food",
+       "messages":[{"role":"user","content":"I want eat pizza"}]}'
 ```
 
 A working response looks like:
 
 ```json
-{"token":"ek_...","expiresAt":1234567890,"model":"gpt-realtime"}
+{"content":"{\"reply\":\"Of course! What would you like to drink?\", ...}"}
 ```
 
 If you get `{"error":"Not authorised."}` the app token is wrong. If you get
-`{"error":"Could not start a voice session."}`, run
-`npx wrangler tail` in one terminal and repeat the curl in another — the real
-OpenAI error will be printed there.
+`{"error":"The tutor is unavailable right now."}`, run `npx wrangler tail` in
+one terminal and repeat the curl in another — the real OpenAI error will be
+printed there.
 
 ---
 
 ## Watch what it costs
 
-Live voice-to-voice is billed per minute of audio, in **both** directions, and
-it is the expensive part of this app by a wide margin. Text chat is cheap by
-comparison.
-
-Before you let anyone else use the app:
+Text is the cheap way to do this — you are sending a few sentences at a time to
+a small model, not streaming audio. Even so:
 
 1. Set a hard spending limit in your OpenAI account
    (Settings → Limits → Usage limits). Do this **today**, not later. It is the
-   only cap OpenAI enforces for you.
-2. Keep `DAILY_VOICE_LIMIT` low while you learn what a session actually costs.
-   Twelve sessions per device per day is already generous.
-3. Watch OpenAI's usage page for the first week.
+   only cap OpenAI enforces for you; everything here is a second line of
+   defence.
+2. Watch OpenAI's usage page for the first week, so you learn what a real
+   conversation actually costs before anyone else is using the app.
 
 ## Endpoints
 
 | Endpoint | Used by | What it does |
 | --- | --- | --- |
-| `POST /v1/session` | Live voice mode | Mints an ephemeral Realtime token, valid ~60s |
-| `POST /v1/chat` | Text tutor and end-of-session reports | Returns the tutor's reply as JSON |
+| `POST /v1/chat` | Every tutor reply, and the end-of-session report | Returns the tutor's reply, corrections and scores as JSON |
 
-Both require the `x-voix-app-token` header and accept an `x-voix-device`
-header used for the daily cap.
+It requires the `x-voix-app-token` header and accepts an `x-voix-device`
+header, used for the daily cap.
 
 ## Changing how the tutor teaches
 
@@ -162,7 +164,12 @@ an app update and waiting for Play review.
 
 ## Honest status
 
-None of this has been run. It was written against OpenAI's published Realtime
-documentation, but I have no OpenAI key and no way to call the API from where
-this was built. Expect to fix something on the first deploy — `npx wrangler
+None of this has been run. It was written against OpenAI's published API
+documentation, but there was no OpenAI key and no way to call the API from
+where it was built. Expect to fix something on the first deploy — `npx wrangler
 tail` shows you exactly what OpenAI is complaining about.
+
+If the app cannot reach this Worker for any reason, it falls back to the
+on-device tutor rather than showing an error. That is deliberate, but it also
+means a misconfigured backend looks like "the tutor got dumb" rather than like
+a failure. Test with the curl above before blaming the app.

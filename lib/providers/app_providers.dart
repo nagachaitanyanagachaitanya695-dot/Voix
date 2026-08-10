@@ -13,7 +13,6 @@ import '../data/repositories/local_store.dart';
 import '../data/repositories/profile_sync.dart';
 import '../data/services/ai_tutor_service.dart';
 import '../data/services/notification_service.dart';
-import '../data/services/realtime_voice_service.dart';
 import '../data/services/remote_ai_tutor_service.dart';
 import '../data/services/speech_service.dart';
 
@@ -83,12 +82,6 @@ final aiTutorProvider = Provider<AiTutorService>((ref) {
   return service;
 });
 
-/// Live speech-to-speech. Only constructed when the learner starts a call.
-final realtimeVoiceProvider = Provider.autoDispose<RealtimeVoiceService>((ref) {
-  final service = RealtimeVoiceService();
-  ref.onDispose(service.dispose);
-  return service;
-});
 
 /// Schedules the daily reminders. Kept alive for the process lifetime so the
 /// timezone database and the notification channel are only set up once.

@@ -3,12 +3,14 @@
  *
  * Its entire job is to hold the OpenAI API key so the app never has to. An
  * APK is a zip file: a key shipped inside one is a key published. This Worker
- * keeps the key server-side and hands the app only short-lived credentials
- * that expire in about a minute.
+ * keeps the key server-side and the app only ever talks to this Worker.
  *
- * Two endpoints:
- *   POST /v1/session  → an ephemeral token for the live voice-to-voice mode
- *   POST /v1/chat     → the text tutor (corrections, scores, replies)
+ * One endpoint:
+ *   POST /v1/chat  → the tutor's reply, corrections and end-of-session scores
+ *
+ * The learner's speech is handled by the phone itself — Android's own
+ * recogniser turns it into text, and the phone's text-to-speech reads the
+ * reply back. Neither costs anything, so audio never reaches this Worker.
  *
  * Deploy instructions: backend/README.md
  */
@@ -42,19 +44,16 @@ export default {
     const url = new URL(request.url);
 
     // ── Budget ─────────────────────────────────────────────────────────
-    // The single most important thing in this file. Live voice costs real
-    // money per minute, and without a cap one person (or one bug that
-    // reconnects in a loop) can run up a bill overnight.
+    // Without a cap, one person — or one retry loop in a bad build — can run
+    // up a bill overnight on your card.
     const deviceId = request.headers.get('x-voix-device') ?? 'unknown';
-    const budget = await checkBudget(env, deviceId, url.pathname);
+    const budget = await checkBudget(env, deviceId);
     if (!budget.ok) {
       return json({ error: budget.message, code: 'budget_exceeded' }, 429, origin);
     }
 
     try {
       switch (url.pathname) {
-        case '/v1/session':
-          return await mintRealtimeToken(request, env, origin);
         case '/v1/chat':
           return await chat(request, env, origin);
         default:
@@ -69,67 +68,7 @@ export default {
   },
 };
 
-/**
- * Mints an ephemeral Realtime credential.
- *
- * The returned `ek_...` value is what the app opens its WebSocket with. It
- * expires in about a minute, so a stolen one is worth almost nothing — which
- * is the entire reason the app is never given the real key.
- */
-async function mintRealtimeToken(request, env, origin) {
-  const body = await safeJson(request);
-
-  const response = await fetch(`${OPENAI}/realtime/client_secrets`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      // Ties the token to one learner, so OpenAI's abuse tooling can act on a
-      // single account rather than on your whole project.
-      ...(body.userId ? { 'safety_identifier': String(body.userId) } : {}),
-      expires_after: { anchor: 'created_at', seconds: 60 },
-      session: {
-        type: 'realtime',
-        // Configured server-side on purpose: you can change the model or the
-        // teaching instructions without shipping an app update, and the app
-        // cannot ask for a more expensive model than you allow.
-        model: env.REALTIME_MODEL,
-        instructions: tutorInstructions(body),
-        audio: {
-          input: {
-            format: { type: 'audio/pcm', rate: 24000 },
-            transcription: { model: env.TRANSCRIBE_MODEL ?? 'whisper-1' },
-            turn_detection: { type: 'server_vad', silence_duration_ms: 700 },
-          },
-          output: {
-            format: { type: 'audio/pcm', rate: 24000 },
-            voice: body.voice === 'female' ? 'shimmer' : 'verse',
-            // Slightly under natural pace: this is a language tutor, and a
-            // learner cannot follow a native-speed reply.
-            speed: 0.95,
-          },
-        },
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    console.error('client_secrets failed', response.status, await response.text());
-    return json({ error: 'Could not start a voice session.' }, 502, origin);
-  }
-
-  const data = await response.json();
-  // Only the token and the model go back to the app. Nothing else.
-  return json(
-    { token: data.value, expiresAt: data.expires_at, model: env.REALTIME_MODEL },
-    200,
-    origin,
-  );
-}
-
-/** The text tutor, used by the non-voice path and for end-of-session reports. */
+/** The tutor: one reply, or one end-of-session report. */
 async function chat(request, env, origin) {
   const body = await safeJson(request);
 
@@ -207,22 +146,18 @@ function tutorInstructions(body) {
  * enforce a cap — so a first deploy works before you have set KV up. Bind it
  * before you tell anyone the app exists.
  */
-async function checkBudget(env, deviceId, pathname) {
+async function checkBudget(env, deviceId) {
   if (!env.VOIX_KV) return { ok: true };
 
-  // Voice is the expensive one, so it gets its own, much tighter cap.
-  const isVoice = pathname === '/v1/session';
-  const limit = Number(isVoice ? env.DAILY_VOICE_LIMIT ?? 12 : env.DAILY_CHAT_LIMIT ?? 300);
+  const limit = Number(env.DAILY_CHAT_LIMIT ?? 300);
   const day = new Date().toISOString().slice(0, 10);
-  const key = `${isVoice ? 'v' : 'c'}:${day}:${deviceId}`;
+  const key = `c:${day}:${deviceId}`;
 
   const used = Number((await env.VOIX_KV.get(key)) ?? 0);
   if (used >= limit) {
     return {
       ok: false,
-      message: isVoice
-        ? 'You have reached today\'s limit for live voice practice. It resets tomorrow.'
-        : 'You have reached today\'s practice limit. It resets tomorrow.',
+      message: 'You have reached today\'s practice limit. It resets tomorrow.',
     };
   }
 

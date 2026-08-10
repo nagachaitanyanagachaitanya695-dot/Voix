@@ -7,16 +7,16 @@ compatibility_date = "2025-01-01"
 # shipping an update — and so the app can never request a costlier model than
 # you allow.
 #
-# CHECK THESE AGAINST OPENAI'S CURRENT MODEL LIST BEFORE DEPLOYING.
+# CHECK THIS AGAINST OPENAI'S CURRENT MODEL LIST BEFORE DEPLOYING.
 # Model names change, and a wrong one fails at runtime with a 400.
 # https://platform.openai.com/docs/models
-REALTIME_MODEL = "gpt-realtime"
+#
+# A small model is the right default here: the tutor writes two or three
+# sentences at a time, which is not work that needs an expensive model.
 CHAT_MODEL = "gpt-4o-mini"
-TRANSCRIBE_MODEL = "whisper-1"
 
-# Daily caps per device. Live voice is billed per minute of audio, so this is
-# your main protection against a surprise bill. Start low.
-DAILY_VOICE_LIMIT = "12"
+# Requests per device per day. One conversation is roughly one request per
+# thing the learner says, plus one for the end-of-session report.
 DAILY_CHAT_LIMIT = "300"
 
 # Enforces the caps above. Create it with:
