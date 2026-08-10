@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/config/backend_config.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_gradients.dart';
@@ -9,6 +10,7 @@ import '../../core/utils/haptics.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/gradient_widgets.dart';
 import '../../core/widgets/mic_button.dart';
+import '../../core/widgets/pressable.dart';
 import '../../core/widgets/staggered.dart';
 import '../../data/models/user_profile.dart';
 import '../../providers/session_controller.dart';
@@ -18,6 +20,7 @@ import '../profile/settings_screen.dart';
 import '../shell/app_shell.dart';
 import 'conversation_screen.dart';
 import 'conversation_summary_screen.dart';
+import 'live_call_screen.dart';
 import 'scenario_picker_sheet.dart';
 
 /// The launchpad for spoken practice: pick a register, then start talking.
@@ -39,6 +42,16 @@ class PracticeScreen extends ConsumerWidget {
         MaterialPageRoute(
           builder: (_) => ConversationScreen(scenario: scenario),
         ),
+      );
+    }
+
+    /// Live speech-to-speech. Only offered when a backend is configured, so a
+    /// build without one never shows a button that cannot work.
+    Future<void> startLiveCall() async {
+      final scenario = await showScenarioPicker(context, ref);
+      if (scenario == null || !context.mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => LiveCallScreen(scenario: scenario)),
       );
     }
 
@@ -277,6 +290,31 @@ class PracticeScreen extends ConsumerWidget {
                     color: c.textSecondary,
                   ),
                 ),
+                if (BackendConfig.isConfigured) ...[
+                  Gap.h20,
+                  Pressable(
+                    onTap: startLiveCall,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: Gap.md,
+                        vertical: Gap.xs,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.graphic_eq_rounded,
+                              size: 18, color: c.primary),
+                          Gap.w8,
+                          Text(
+                            'Or have a live call',
+                            style: context.text.titleSmall
+                                ?.copyWith(color: c.primary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

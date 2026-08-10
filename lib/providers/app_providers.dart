@@ -1,14 +1,20 @@
+import 'dart:async';
+import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/config/backend_config.dart';
 import '../data/repositories/auth_repository.dart';
 import '../data/repositories/firebase_auth_repository.dart';
 import '../data/repositories/local_store.dart';
 import '../data/repositories/profile_sync.dart';
 import '../data/services/ai_tutor_service.dart';
 import '../data/services/notification_service.dart';
+import '../data/services/realtime_voice_service.dart';
+import '../data/services/remote_ai_tutor_service.dart';
 import '../data/services/speech_service.dart';
 
 /// Injected in `main()` once [LocalStore.open] resolves, so the rest of the
@@ -48,10 +54,41 @@ final profileSyncProvider = Provider<ProfileSync>((ref) {
   return sync;
 });
 
-/// Likewise: point this at a hosted LLM client to upgrade the tutor.
-final aiTutorProvider = Provider<AiTutorService>(
-  (ref) => LocalAiTutorService(),
-);
+/// A stable per-install identifier, used only for the backend's daily
+/// spending cap.
+///
+/// Deliberately random rather than a real device id: an Android ID or an
+/// advertising id would be personal data with all the disclosure that entails,
+/// and this only needs to tell one install apart from another.
+final deviceIdProvider = Provider<String>((ref) {
+  final store = ref.watch(localStoreProvider);
+  final existing = store.getString(LocalStore.kDeviceId);
+  if (existing != null && existing.isNotEmpty) return existing;
+
+  final generated = 'd_${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}'
+      '${Random().nextInt(1 << 32).toRadixString(36)}';
+  unawaited(store.setString(LocalStore.kDeviceId, generated));
+  return generated;
+});
+
+/// The real tutor when a backend is configured, the on-device one otherwise.
+///
+/// [RemoteAiTutorService] keeps [LocalAiTutorService] as its fallback, so even
+/// with a backend the app degrades to a working conversation rather than an
+/// error when the network is gone.
+final aiTutorProvider = Provider<AiTutorService>((ref) {
+  if (!BackendConfig.isConfigured) return LocalAiTutorService();
+  final service = RemoteAiTutorService(deviceId: ref.watch(deviceIdProvider));
+  ref.onDispose(service.dispose);
+  return service;
+});
+
+/// Live speech-to-speech. Only constructed when the learner starts a call.
+final realtimeVoiceProvider = Provider.autoDispose<RealtimeVoiceService>((ref) {
+  final service = RealtimeVoiceService();
+  ref.onDispose(service.dispose);
+  return service;
+});
 
 /// Schedules the daily reminders. Kept alive for the process lifetime so the
 /// timezone database and the notification channel are only set up once.

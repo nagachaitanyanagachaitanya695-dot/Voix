@@ -52,3 +52,7 @@ lib/firebase_options.dart
 # Screenshots are regenerated on demand:
 #   flutter test test/render_screens.dart --update-goldens --tags render
 # They are committed so the UI can be reviewed without a device.
+
+# Backend URL and app token, injected with --dart-define-from-file.
+# Never commit the real one.
+env.json

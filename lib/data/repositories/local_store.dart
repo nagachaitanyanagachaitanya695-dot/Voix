@@ -24,6 +24,10 @@ class LocalStore {
   static const kSignedIn = 'voix.signedIn';
   static const kSavedPhrases = 'voix.savedPhrases';
 
+  /// A random per-install id, used only for the backend's daily spending cap.
+  /// Not a hardware identifier — see `deviceIdProvider`.
+  static const kDeviceId = 'voix.deviceId';
+
   // ── Primitives ─────────────────────────────────────────────────────────
   String? getString(String key) => _prefs.getString(key);
   Future<void> setString(String key, String value) =>

@@ -18,6 +18,12 @@ dependencies:
   # Voice
   speech_to_text: ^7.0.0
   flutter_tts: ^4.2.0
+  # Live voice-to-voice. Only used when the learner opts into it; the free
+  # on-device speech path above works with none of these.
+  web_socket_channel: any
+  record: any
+  flutter_pcm_sound: any
+  http: any
   # Accounts and cloud sync. Optional at runtime — see lib/firebase_options.dart.
   firebase_core: ^4.13.0
   firebase_auth: ^6.5.7

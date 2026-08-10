@@ -1,0 +1,33 @@
+name = "voix-backend"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+# Model IDs live here rather than in the app, so you can change them without
+# shipping an update — and so the app can never request a costlier model than
+# you allow.
+#
+# CHECK THESE AGAINST OPENAI'S CURRENT MODEL LIST BEFORE DEPLOYING.
+# Model names change, and a wrong one fails at runtime with a 400.
+# https://platform.openai.com/docs/models
+REALTIME_MODEL = "gpt-realtime"
+CHAT_MODEL = "gpt-4o-mini"
+TRANSCRIBE_MODEL = "whisper-1"
+
+# Daily caps per device. Live voice is billed per minute of audio, so this is
+# your main protection against a surprise bill. Start low.
+DAILY_VOICE_LIMIT = "12"
+DAILY_CHAT_LIMIT = "300"
+
+# Enforces the caps above. Create it with:
+#   npx wrangler kv namespace create VOIX_KV
+# then paste the printed id below and uncomment.
+# Without it the Worker runs but enforces no limit at all.
+# [[kv_namespaces]]
+# binding = "VOIX_KV"
+# id = "paste-the-id-wrangler-prints"
+
+# Secrets are NOT set here — this file is committed to git.
+# Set them from the terminal instead:
+#   npx wrangler secret put OPENAI_API_KEY
+#   npx wrangler secret put APP_TOKEN
