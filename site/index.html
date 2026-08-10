@@ -267,7 +267,21 @@ section{
 }
 
 /* ── Pricing ────────────────────────────────────────────────── */
-.gate{padding:1.4rem 1.5rem; display:grid; gap:.7rem; margin-bottom:1.3rem}
+.gate{padding:1.4rem 1.5rem; display:grid; gap:.85rem; margin-bottom:1.3rem}
+.gate__title{font-size:1.02rem; font-weight:650; margin:0}
+.field{display:grid; gap:.35rem}
+.field label{
+  font-family:var(--mono); font-size:.66rem; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--text-3);
+}
+.gate .btn{justify-self:start; min-width:9rem}
+.gate .btn[disabled]{opacity:.55; cursor:progress}
+.signed{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:1rem; flex-wrap:wrap;
+}
+.signed__who{margin:0; font-size:.95rem; color:var(--text-2)}
+.signed__who b{color:var(--text)}
 .gate__label{font-family:var(--mono); font-size:.68rem; letter-spacing:.14em; text-transform:uppercase; color:var(--gold)}
 .gate input{
   width:100%; background:rgba(4,6,15,.5); border:1px solid var(--line);
@@ -279,10 +293,9 @@ section{
 .gate input:focus{border-color:rgba(255,197,61,.65)}
 .gate input:focus-visible{outline:2px solid var(--gold); outline-offset:2px}
 .gate__help{font-size:.84rem; color:var(--text-2); margin:0}
-.gate__err{font-size:.84rem; color:#FF7A93; margin:0; display:none}
-.gate.is-bad input{border-color:rgba(255,122,147,.7)}
+.gate__err{font-size:.86rem; color:#FF7A93; margin:0; display:none}
 .gate.is-bad .gate__err{display:block}
-.gate.is-ok input{border-color:rgba(74,222,128,.45)}
+.gate.is-bad input{border-color:rgba(255,122,147,.6)}
 
 .plans{display:grid; gap:1.1rem; grid-template-columns:repeat(auto-fit,minmax(282px,1fr)); align-items:stretch}
 .plan{padding:1.8rem 1.6rem; display:flex; flex-direction:column;
@@ -495,18 +508,37 @@ footer a:hover{color:var(--cyan)}
   <div class="head reveal">
     <p class="eyebrow eyebrow--gold">Voix Pro</p>
     <h2>Everything you need to reach fluency faster</h2>
-    <p class="lede">Enter the email you sign in with, pick a plan, and pay on WhatsApp.
-      Pro is switched on for that account.</p>
+    <p class="lede">Sign in with your Voix account, pick a plan, and pay on WhatsApp. Pro is
+      switched on for the account you signed in with.</p>
   </div>
 
-  <div class="frost gate reveal" id="gate">
-    <label class="gate__label" for="email">Your Voix sign-in email</label>
-    <input id="email" type="email" inputmode="email" autocomplete="email"
-           spellcheck="false" placeholder="you@example.com" aria-describedby="gate-help">
-    <p class="gate__help" id="gate-help">Pro is activated on this account only. Use the same
-      email you sign in to the app with — if you have not signed up yet, create your account
-      in the app first.</p>
-    <p class="gate__err" id="gate-err">Enter the email address you sign in with.</p>
+  <form class="frost gate reveal" id="gate" novalidate>
+    <p class="gate__title">Sign in to continue</p>
+
+    <div class="field">
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" inputmode="email"
+             autocomplete="email" spellcheck="false" placeholder="you@example.com"
+             aria-describedby="gate-help">
+    </div>
+
+    <div class="field">
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password"
+             autocomplete="current-password" placeholder="Your Voix password">
+    </div>
+
+    <button type="submit" class="btn btn--gold" id="login">Log in</button>
+
+    <p class="gate__err" id="gate-err" role="alert"></p>
+    <p class="gate__help" id="gate-help">Use the same email and password you sign in to the
+      Voix app with. Pro is switched on for that account. Your password is sent straight to
+      Firebase to be checked — it is never stored by this page.</p>
+  </form>
+
+  <div class="frost gate signed reveal" id="signed" hidden>
+    <p class="signed__who">Signed in as <b id="signed-email"></b></p>
+    <button type="button" class="btn btn--ghost btn--sm" id="logout">Sign out</button>
   </div>
 
   <div class="plans">
@@ -560,9 +592,9 @@ footer a:hover{color:var(--cyan)}
   </div>
   <ol class="steps reveal">
     <li class="panel">
-      <h3>Pick a plan</h3>
-      <p>Enter your sign-in email and tap buy. WhatsApp opens with your order already
-        written out — plan, price and email.</p>
+      <h3>Sign in and pick a plan</h3>
+      <p>Log in with your Voix email and password, then tap buy. WhatsApp opens with your
+        order already written out — plan, price and account.</p>
     </li>
     <li class="panel">
       <h3>Pay on WhatsApp</h3>
@@ -589,9 +621,9 @@ footer a:hover{color:var(--cyan)}
   <div class="faq reveal">
     <details class="panel">
       <summary>Which email should I use?</summary>
-      <p>The one you sign in to the Voix app with. Pro is attached to that account, so an
-        email that has never been used to sign up cannot be upgraded. If you have not made an
-        account yet, open the app and sign up first — it takes a moment and it is free.</p>
+      <p>The one you sign in to the Voix app with — you log in here with the same email and
+        password, so Pro lands on the right account. If you have not made an account yet,
+        open the app and sign up first; it takes a moment and it is free.</p>
     </details>
     <details class="panel">
       <summary>How long until Pro is active?</summary>
@@ -1231,52 +1263,165 @@ footer a:hover{color:var(--cyan)}
      ───────────────────────────────────────────────────────────── */
   var WHATSAPP_NUMBER = '917032127145';
 
-  var gate     = document.getElementById('gate');
-  var emailEl  = document.getElementById('email');
-  var buyBtns  = Array.prototype.slice.call(document.querySelectorAll('[data-buy]'));
+  /* ─────────────────────────────────────────────────────────────
+     SET THIS BEFORE GOING LIVE — your Firebase Web API key.
 
-  // Deliberately permissive: something@something.tld with no spaces. The real
-  // check is that the address matches an account, and only the app can do that.
-  function validEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()); }
+     Firebase Console -> Project settings -> General -> Your apps ->
+     Web app -> firebaseConfig.apiKey. It starts with "AIza".
 
-  function currentEmail() { return emailEl ? emailEl.value.trim() : ''; }
+     This is the ONLY value sign-in needs. It is not a secret: a
+     Firebase apiKey identifies a project, it does not authorise
+     anything (docs/FIREBASE_SETUP.md says the same). Accounts are
+     protected by passwords and Firestore rules, not by hiding it.
 
-  function syncGate() {
-    var ok = validEmail(currentEmail());
-    var touched = currentEmail().length > 0;
-    gate.classList.toggle('is-ok', ok);
-    gate.classList.toggle('is-bad', touched && !ok);
-    buyBtns.forEach(function (b) {
-      b.classList.toggle('is-locked', !ok);
-      b.setAttribute('aria-disabled', ok ? 'false' : 'true');
-    });
-    if (ok) { try { localStorage.setItem('voix.email', currentEmail()); } catch (e) {} }
-    return ok;
+     While it is empty, Log in refuses and says so. It never pretends
+     a password was accepted.
+     ───────────────────────────────────────────────────────────── */
+  var FIREBASE_API_KEY = '';
+
+  var AUTH_URL = 'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=';
+
+  var gate      = document.getElementById('gate');
+  var emailEl   = document.getElementById('email');
+  var passEl    = document.getElementById('password');
+  var loginBtn  = document.getElementById('login');
+  var errEl     = document.getElementById('gate-err');
+  var signedBox = document.getElementById('signed');
+  var signedWho = document.getElementById('signed-email');
+  var logoutBtn = document.getElementById('logout');
+  var buyBtns   = Array.prototype.slice.call(document.querySelectorAll('[data-buy]'));
+
+  // Set only by a successful Firebase sign-in. The password is never kept.
+  var account = null;
+
+  function showError(msg) {
+    errEl.textContent = msg;
+    gate.classList.add('is-bad');
+  }
+  function clearError() {
+    errEl.textContent = '';
+    gate.classList.remove('is-bad');
   }
 
-  if (emailEl) {
+  function setSignedIn(acc) {
+    account = acc;
+    signedWho.textContent = acc.email;
+    gate.hidden = true;
+    signedBox.hidden = false;
+    buyBtns.forEach(function (b) {
+      b.classList.remove('is-locked');
+      b.setAttribute('aria-disabled', 'false');
+    });
+    try { localStorage.setItem('voix.email', acc.email); } catch (e) {}
+  }
+
+  function setSignedOut() {
+    account = null;
+    gate.hidden = false;
+    signedBox.hidden = true;
+    if (passEl) passEl.value = '';
+    buyBtns.forEach(function (b) {
+      b.classList.add('is-locked');
+      b.setAttribute('aria-disabled', 'true');
+    });
+  }
+
+  // Firebase's error codes, turned into something a learner can act on.
+  function readableAuthError(code) {
+    switch (code) {
+      case 'EMAIL_NOT_FOUND':
+        return 'No Voix account uses that email. Sign up in the app first — it is free.';
+      case 'INVALID_PASSWORD':
+      case 'INVALID_LOGIN_CREDENTIALS':
+        return 'That email and password do not match. If you signed up with Google, ' +
+               'set a password in the app first, or message us on WhatsApp.';
+      case 'USER_DISABLED':
+        return 'That account has been disabled. Message us on WhatsApp and we will sort it.';
+      case 'TOO_MANY_ATTEMPTS_TRY_LATER':
+        return 'Too many attempts. Wait a few minutes and try again.';
+      case 'MISSING_PASSWORD':
+        return 'Enter your password.';
+      default:
+        return 'Could not sign in (' + code + '). Try again, or message us on WhatsApp.';
+    }
+  }
+
+  function login(e) {
+    if (e) e.preventDefault();
+    clearError();
+
+    var email = emailEl.value.trim();
+    var pass  = passEl.value;
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      showError('Enter the email address you sign in with.');
+      emailEl.focus();
+      return;
+    }
+    if (!pass) {
+      showError('Enter your password.');
+      passEl.focus();
+      return;
+    }
+    if (!FIREBASE_API_KEY) {
+      showError('Sign-in is not switched on yet — FIREBASE_API_KEY has not been set in ' +
+                'this page. Nothing was sent, and your password was not checked.');
+      return;
+    }
+
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Signing in…';
+
+    // Straight to Google's Identity Toolkit over HTTPS. The password does not
+    // touch this page's storage and is not sent anywhere else.
+    fetch(AUTH_URL + FIREBASE_API_KEY, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, password: pass, returnSecureToken: true })
+    })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+      .then(function (res) {
+        if (!res.ok) {
+          var code = (res.body && res.body.error && res.body.error.message) || 'UNKNOWN';
+          showError(readableAuthError(String(code).split(' ')[0]));
+          return;
+        }
+        passEl.value = '';                       // drop it the moment it is spent
+        setSignedIn({ email: res.body.email, uid: res.body.localId });
+      })
+      .catch(function () {
+        showError('Could not reach the sign-in service. Check your connection and try again.');
+      })
+      .then(function () {
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Log in';
+      });
+  }
+
+  if (gate) {
+    gate.addEventListener('submit', login);
     try {
       var saved = localStorage.getItem('voix.email');
-      if (saved) emailEl.value = saved;
+      if (saved && emailEl) emailEl.value = saved;
     } catch (e) {}
-    emailEl.addEventListener('input', syncGate);
-    emailEl.addEventListener('blur', syncGate);
-    syncGate();
   }
+  if (logoutBtn) logoutBtn.addEventListener('click', setSignedOut);
+  setSignedOut();
 
   function buy(plan, price) {
-    // No email, no order — otherwise there is no way to know which account to upgrade.
-    if (!syncGate()) {
-      gate.classList.add('is-bad');
-      emailEl.focus();
+    // Only a verified account can be upgraded, so there is nothing to send without one.
+    if (!account) {
+      showError('Sign in first — Pro is switched on for your account.');
       gate.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (emailEl) emailEl.focus();
       return;
     }
 
     var msg = 'Hi! I would like to buy Voix Pro.\n\n' +
               'Plan: ' + plan + '\n' +
               'Price: ' + price + '\n' +
-              'Account email: ' + currentEmail() + '\n\n' +
+              'Account email: ' + account.email + '\n' +
+              'Account ID: ' + account.uid + '\n\n' +
               'Please send me the payment details.';
 
     if (!WHATSAPP_NUMBER) {
