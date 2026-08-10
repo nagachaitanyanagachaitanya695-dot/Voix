@@ -13,8 +13,10 @@ import '../data/repositories/local_store.dart';
 import '../data/repositories/profile_sync.dart';
 import '../data/services/ai_tutor_service.dart';
 import '../data/services/notification_service.dart';
+import '../data/services/realtime_voice_service.dart';
 import '../data/services/remote_ai_tutor_service.dart';
 import '../data/services/speech_service.dart';
+import '../data/services/subscription_service.dart';
 
 /// Injected in `main()` once [LocalStore.open] resolves, so the rest of the
 /// tree can read storage synchronously and the first frame renders with real
@@ -82,6 +84,22 @@ final aiTutorProvider = Provider<AiTutorService>((ref) {
   return service;
 });
 
+
+/// Live speech-to-speech. Only constructed when a call actually starts.
+final realtimeVoiceProvider = Provider.autoDispose<RealtimeVoiceService>((ref) {
+  final service = RealtimeVoiceService();
+  ref.onDispose(service.dispose);
+  return service;
+});
+
+/// Play Billing. Kept alive for the process so the purchase stream is never
+/// dropped — Play re-delivers a completed purchase once, and missing it means
+/// someone paid and did not get what they paid for.
+final subscriptionServiceProvider = Provider<SubscriptionService>((ref) {
+  final service = SubscriptionService();
+  ref.onDispose(service.dispose);
+  return service;
+});
 
 /// Schedules the daily reminders. Kept alive for the process lifetime so the
 /// timezone database and the notification channel are only set up once.

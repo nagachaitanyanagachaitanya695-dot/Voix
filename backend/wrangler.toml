@@ -15,9 +15,22 @@ compatibility_date = "2025-01-01"
 # sentences at a time, which is not work that needs an expensive model.
 CHAT_MODEL = "gpt-4o-mini"
 
+# Live voice-to-voice, for subscribers only.
+REALTIME_MODEL = "gpt-realtime"
+TRANSCRIBE_MODEL = "whisper-1"
+
+# Your app's package name, checked against the Play purchase.
+ANDROID_PACKAGE_NAME = "com.voix.voix"
+
 # Requests per device per day. One conversation is roughly one request per
 # thing the learner says, plus one for the end-of-session report.
 DAILY_CHAT_LIMIT = "300"
+
+# Live voice sessions per device per day. Billed per minute of audio in both
+# directions, so this is the number that decides whether a subscription earns
+# money or loses it. Twelve is already generous; work out what one session
+# costs before raising it.
+DAILY_VOICE_LIMIT = "12"
 
 # Enforces the caps above. Create it with:
 #   npx wrangler kv namespace create VOIX_KV
@@ -31,3 +44,4 @@ DAILY_CHAT_LIMIT = "300"
 # Set them from the terminal instead:
 #   npx wrangler secret put OPENAI_API_KEY
 #   npx wrangler secret put APP_TOKEN
+#   npx wrangler secret put PLAY_SERVICE_ACCOUNT_JSON   (the whole JSON file)

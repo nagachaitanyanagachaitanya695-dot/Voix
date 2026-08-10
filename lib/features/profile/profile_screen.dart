@@ -10,7 +10,6 @@ import '../../core/utils/haptics.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/staggered.dart';
-import '../../core/widgets/voix_button.dart';
 import '../../core/widgets/xp_bar.dart';
 import '../../data/models/language.dart';
 import '../../data/models/user_profile.dart';
@@ -18,6 +17,7 @@ import '../../providers/user_controller.dart';
 import '../auth/auth_screen.dart';
 import 'help_screen.dart';
 import 'notifications_screen.dart';
+import 'premium_screen.dart';
 import 'privacy_screen.dart';
 import 'settings_screen.dart';
 import 'widgets/settings_tile.dart';
@@ -390,10 +390,11 @@ class ProfileScreen extends ConsumerWidget {
         );
       return;
     }
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => const _ProSheet(),
+    // A full screen rather than the old marketing sheet: this one takes money,
+    // and a payment flow needs room for the price, the restore option and the
+    // Play billing terms.
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const PremiumScreen()),
     );
   }
 
@@ -703,116 +704,3 @@ class _UpgradeButton extends StatelessWidget {
   }
 }
 
-class _ProSheet extends ConsumerWidget {
-  const _ProSheet();
-
-  static const _perks = [
-    (Icons.all_inclusive_rounded, 'Unlimited conversations',
-        'No daily practice limit, ever'),
-    (Icons.theater_comedy_rounded, 'All roleplay scenarios',
-        'Airport, presentations, interviews and more'),
-    (Icons.school_rounded, 'Pro lessons',
-        'Advanced grammar and interview coaching'),
-    (Icons.insights_rounded, 'Deep progress insights',
-        'Track pronunciation trends over time'),
-  ];
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final c = context.colors;
-
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.xs, Gap.lg, Gap.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 62,
-              height: 62,
-              decoration: BoxDecoration(
-                gradient: VoixGradients.gold,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: c.gold.withValues(alpha: 0.42),
-                    blurRadius: 26,
-                    spreadRadius: -6,
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.workspace_premium_rounded,
-                size: 30,
-                color: Colors.white,
-              ),
-            ),
-            Gap.h16,
-            Text('Voix Pro', style: context.text.displaySmall),
-            Gap.h4,
-            Text(
-              'Everything you need to reach fluency faster.',
-              textAlign: TextAlign.center,
-              style: context.text.bodyMedium,
-            ),
-            Gap.h24,
-            for (final perk in _perks)
-              Padding(
-                padding: const EdgeInsets.only(bottom: Gap.sm + 2),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: c.gold.withValues(alpha: 0.13),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(perk.$1, size: 17, color: c.gold),
-                    ),
-                    Gap.w12,
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(perk.$2, style: context.text.titleSmall),
-                          const SizedBox(height: 2),
-                          Text(perk.$3, style: context.text.labelSmall),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            Gap.h8,
-            VoixButton(
-              label: 'Upgrade to Pro',
-              icon: Icons.workspace_premium_rounded,
-              gradient: VoixGradients.gold,
-              onPressed: () {
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Billing is not wired up yet — connect Play Billing '
-                        'to enable purchases.',
-                      ),
-                      duration: Duration(seconds: 4),
-                    ),
-                  );
-              },
-            ),
-            Gap.h8,
-            VoixButton.ghost(
-              label: 'Maybe later',
-              expand: true,
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

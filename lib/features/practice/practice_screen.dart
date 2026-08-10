@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/config/backend_config.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_gradients.dart';
@@ -9,15 +10,18 @@ import '../../core/utils/haptics.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/gradient_widgets.dart';
 import '../../core/widgets/mic_button.dart';
+import '../../core/widgets/pressable.dart';
 import '../../core/widgets/staggered.dart';
 import '../../data/models/user_profile.dart';
 import '../../providers/session_controller.dart';
 import '../../providers/user_controller.dart';
 import '../onboarding/widgets/option_tile.dart';
+import '../profile/premium_screen.dart';
 import '../profile/settings_screen.dart';
 import '../shell/app_shell.dart';
 import 'conversation_screen.dart';
 import 'conversation_summary_screen.dart';
+import 'live_call_screen.dart';
 import 'scenario_picker_sheet.dart';
 
 /// The launchpad for spoken practice: pick a register, then start talking.
@@ -42,6 +46,22 @@ class PracticeScreen extends ConsumerWidget {
       );
     }
 
+    /// Live speech-to-speech — a Premium feature, and only shown at all when a
+    /// backend exists to serve it. Non-subscribers get the paywall rather than
+    /// a call that would be refused server-side anyway.
+    Future<void> startLiveCall() async {
+      if (!user.isPro) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const PremiumScreen()),
+        );
+        return;
+      }
+      final scenario = await showScenarioPicker(context, ref);
+      if (scenario == null || !context.mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => LiveCallScreen(scenario: scenario)),
+      );
+    }
 
     return SafeArea(
       bottom: false,
@@ -278,6 +298,38 @@ class PracticeScreen extends ConsumerWidget {
                     color: c.textSecondary,
                   ),
                 ),
+                if (BackendConfig.isConfigured) ...[
+                  Gap.h20,
+                  Pressable(
+                    onTap: startLiveCall,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: Gap.md,
+                        vertical: Gap.xs,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            user.isPro
+                                ? Icons.graphic_eq_rounded
+                                : Icons.lock_outline_rounded,
+                            size: 18,
+                            color: c.primary,
+                          ),
+                          Gap.w8,
+                          Text(
+                            user.isPro
+                                ? 'Or have a live call'
+                                : 'Live call — Premium',
+                            style: context.text.titleSmall
+                                ?.copyWith(color: c.primary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

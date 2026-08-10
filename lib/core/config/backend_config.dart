@@ -32,4 +32,7 @@ abstract final class BackendConfig {
 
   static Uri get sessionUrl => Uri.parse('$baseUrl/v1/session');
   static Uri get chatUrl => Uri.parse('$baseUrl/v1/chat');
+
+  /// Where a Play purchase token is sent to be checked against Google.
+  static Uri get verifyUrl => Uri.parse('$baseUrl/v1/verify');
 }

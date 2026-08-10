@@ -20,6 +20,13 @@ dependencies:
   flutter_tts: ^4.2.0
   # Talking to the Voix backend (see backend/README.md).
   http: ^1.6.0
+  # Subscriptions, through Google Play Billing. Play supports UPI in India, and
+  # selling an in-app feature any other way is a Play policy problem.
+  in_app_purchase: any
+  # Live voice-to-voice, for subscribers only.
+  web_socket_channel: any
+  record: any
+  flutter_pcm_sound: any
   # Accounts and cloud sync. Optional at runtime — see lib/firebase_options.dart.
   firebase_core: ^4.13.0
   firebase_auth: ^6.5.7

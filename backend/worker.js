@@ -5,12 +5,18 @@
  * APK is a zip file: a key shipped inside one is a key published. This Worker
  * keeps the key server-side and the app only ever talks to this Worker.
  *
- * One endpoint:
- *   POST /v1/chat  → the tutor's reply, corrections and end-of-session scores
+ * Endpoints:
+ *   POST /v1/chat    → the tutor's reply, corrections and end-of-session scores
+ *   POST /v1/verify  → checks a Play purchase token with Google, grants premium
+ *   POST /v1/session → an ephemeral live-voice token, subscribers only
  *
- * The learner's speech is handled by the phone itself — Android's own
- * recogniser turns it into text, and the phone's text-to-speech reads the
- * reply back. Neither costs anything, so audio never reaches this Worker.
+ * For everyone, speech is handled by the phone itself — Android's own
+ * recogniser turns it into text and its text-to-speech reads the reply back.
+ * That costs nothing. Live voice-to-voice streams audio to OpenAI and is
+ * billed per minute in both directions, which is why it is the paid feature
+ * and why /v1/session refuses anyone this Worker has not verified as a
+ * subscriber. The app also hides it from non-subscribers, but that is a
+ * courtesy, not the control: an APK can be edited, this Worker cannot.
  *
  * Deploy instructions: backend/README.md
  */
@@ -47,7 +53,7 @@ export default {
     // Without a cap, one person — or one retry loop in a bad build — can run
     // up a bill overnight on your card.
     const deviceId = request.headers.get('x-voix-device') ?? 'unknown';
-    const budget = await checkBudget(env, deviceId);
+    const budget = await checkBudget(env, deviceId, url.pathname);
     if (!budget.ok) {
       return json({ error: budget.message, code: 'budget_exceeded' }, 429, origin);
     }
@@ -56,6 +62,10 @@ export default {
       switch (url.pathname) {
         case '/v1/chat':
           return await chat(request, env, origin);
+        case '/v1/verify':
+          return await verifyPurchase(request, env, origin);
+        case '/v1/session':
+          return await mintRealtimeToken(request, env, origin);
         default:
           return json({ error: 'Unknown endpoint.' }, 404, origin);
       }
@@ -67,6 +77,126 @@ export default {
     }
   },
 };
+
+/**
+ * Checks a Play purchase token with Google and records the entitlement.
+ *
+ * The app tells us it bought something; Google tells us whether that is true.
+ * Only Google's answer is stored.
+ */
+async function verifyPurchase(request, env, origin) {
+  const body = await safeJson(request);
+  const userId = String(body.userId ?? '').slice(0, 128);
+  const purchaseToken = String(body.purchaseToken ?? '');
+
+  if (!userId || !purchaseToken) {
+    return json({ premium: false, error: 'Missing account or token.' }, 400, origin);
+  }
+  if (!env.PLAY_SERVICE_ACCOUNT_JSON || !env.ANDROID_PACKAGE_NAME) {
+    console.error('verify: Play credentials not configured');
+    return json({ premium: false, error: 'Server is not configured.' }, 500, origin);
+  }
+
+  const accessToken = await googleAccessToken(env);
+  const url =
+    `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/` +
+    `${encodeURIComponent(env.ANDROID_PACKAGE_NAME)}/purchases/subscriptionsv2/` +
+    `tokens/${encodeURIComponent(purchaseToken)}`;
+
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!response.ok) {
+    // A 404 here is the normal answer for a token that was never real, so this
+    // is not necessarily an outage.
+    console.error('verify: Google said', response.status, await response.text());
+    return json({ premium: false }, 200, origin);
+  }
+
+  const subscription = await response.json();
+
+  // ACTIVE covers a paid subscription; IN_GRACE_PERIOD is someone whose
+  // payment failed but whose access Google expects us to keep for now.
+  // Cancelling does not end access — subscriptionState stays ACTIVE until the
+  // paid period actually runs out, which is what expiryTime tells us.
+  const activeStates = ['SUBSCRIPTION_STATE_ACTIVE', 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD'];
+  const expiryTime = subscription?.lineItems?.[0]?.expiryTime;
+  const expiresAt = expiryTime ? Date.parse(expiryTime) : 0;
+
+  const premium =
+    activeStates.includes(subscription?.subscriptionState) && expiresAt > Date.now();
+
+  if (premium) {
+    await grantPremium(env, userId, expiresAt);
+  }
+
+  return json({ premium, expiresAt: premium ? expiresAt : null }, 200, origin);
+}
+
+/**
+ * Mints an ephemeral Realtime credential — subscribers only.
+ *
+ * The returned `ek_...` value expires in about a minute, so a stolen one is
+ * worth almost nothing, which is why the app is never given the real key.
+ */
+async function mintRealtimeToken(request, env, origin) {
+  const body = await safeJson(request);
+  const userId = String(body.userId ?? '');
+
+  if (!(await hasPremium(env, userId))) {
+    return json(
+      { error: 'Live voice is part of Voix Premium.', code: 'not_subscribed' },
+      402,
+      origin,
+    );
+  }
+
+  const response = await fetch(`${OPENAI}/realtime/client_secrets`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      safety_identifier: userId,
+      expires_after: { anchor: 'created_at', seconds: 60 },
+      session: {
+        type: 'realtime',
+        // Server-side so the model and the teaching prompt can change without
+        // an app update, and so the app cannot ask for a costlier model.
+        model: env.REALTIME_MODEL,
+        instructions: tutorInstructions(body),
+        audio: {
+          input: {
+            format: { type: 'audio/pcm', rate: 24000 },
+            transcription: { model: env.TRANSCRIBE_MODEL ?? 'whisper-1' },
+            turn_detection: { type: 'server_vad', silence_duration_ms: 700 },
+          },
+          output: {
+            format: { type: 'audio/pcm', rate: 24000 },
+            voice: body.voice === 'female' ? 'shimmer' : 'verse',
+            // Slightly under natural pace: a learner cannot follow a reply
+            // delivered at native speed.
+            speed: 0.95,
+          },
+        },
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    console.error('client_secrets failed', response.status, await response.text());
+    return json({ error: 'Could not start a voice session.' }, 502, origin);
+  }
+
+  const data = await response.json();
+  return json(
+    { token: data.value, expiresAt: data.expires_at, model: env.REALTIME_MODEL },
+    200,
+    origin,
+  );
+}
 
 /** The tutor: one reply, or one end-of-session report. */
 async function chat(request, env, origin) {
@@ -146,24 +276,159 @@ function tutorInstructions(body) {
  * enforce a cap — so a first deploy works before you have set KV up. Bind it
  * before you tell anyone the app exists.
  */
-async function checkBudget(env, deviceId) {
+async function checkBudget(env, deviceId, pathname) {
+  // Confirming a purchase must never be rate-limited: someone who has just
+  // paid and cannot be verified is someone about to demand a refund.
+  if (pathname === '/v1/verify') return { ok: true };
   if (!env.VOIX_KV) return { ok: true };
 
-  const limit = Number(env.DAILY_CHAT_LIMIT ?? 300);
+  // Live voice is billed per minute of audio, so it gets its own, much
+  // tighter cap than text.
+  const isVoice = pathname === '/v1/session';
+  const limit = Number(
+    isVoice ? env.DAILY_VOICE_LIMIT ?? 12 : env.DAILY_CHAT_LIMIT ?? 300,
+  );
   const day = new Date().toISOString().slice(0, 10);
-  const key = `c:${day}:${deviceId}`;
+  const key = `${isVoice ? 'v' : 'c'}:${day}:${deviceId}`;
 
   const used = Number((await env.VOIX_KV.get(key)) ?? 0);
   if (used >= limit) {
     return {
       ok: false,
-      message: 'You have reached today\'s practice limit. It resets tomorrow.',
+      message: isVoice
+        ? 'You have reached today\'s limit for live voice practice. It resets tomorrow.'
+        : 'You have reached today\'s practice limit. It resets tomorrow.',
     };
   }
 
   // Two days, so a request just before midnight cannot resurrect a stale count.
   await env.VOIX_KV.put(key, String(used + 1), { expirationTtl: 60 * 60 * 48 });
   return { ok: true };
+}
+
+// ── Entitlement ───────────────────────────────────────────────────────────
+
+/**
+ * Records that an account is a subscriber until [expiresAt].
+ *
+ * Stored with a TTL matching the subscription's own expiry, so premium lapses
+ * on its own if the learner stops paying and the app never checks in again.
+ */
+async function grantPremium(env, userId, expiresAt) {
+  if (!env.VOIX_KV) {
+    console.error('grantPremium: VOIX_KV is not bound — entitlement not stored');
+    return;
+  }
+  const ttl = Math.max(60, Math.floor((expiresAt - Date.now()) / 1000));
+  await env.VOIX_KV.put(`premium:${userId}`, String(expiresAt), {
+    expirationTtl: ttl,
+  });
+}
+
+/**
+ * Whether this account may use paid features.
+ *
+ * Fails **closed**: with no KV bound there is no way to know who paid, and
+ * guessing "yes" would hand a per-minute-billed feature to everyone.
+ */
+async function hasPremium(env, userId) {
+  if (!userId || !env.VOIX_KV) return false;
+  const until = Number((await env.VOIX_KV.get(`premium:${userId}`)) ?? 0);
+  return until > Date.now();
+}
+
+// ── Google service account ────────────────────────────────────────────────
+
+/**
+ * Exchanges the service account key for a short-lived Google access token.
+ *
+ * Signed here with WebCrypto rather than with a library: Workers have no
+ * Node crypto, and the whole flow is one JWT and one POST.
+ */
+async function googleAccessToken(env) {
+  const cached = _tokenCache;
+  if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token;
+
+  const credentials = JSON.parse(env.PLAY_SERVICE_ACCOUNT_JSON);
+  const now = Math.floor(Date.now() / 1000);
+
+  const claim = {
+    iss: credentials.client_email,
+    scope: 'https://www.googleapis.com/auth/androidpublisher',
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: now + 3600,
+  };
+
+  const unsigned =
+    `${base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))}.` +
+    `${base64url(JSON.stringify(claim))}`;
+
+  const key = await crypto.subtle.importKey(
+    'pkcs8',
+    pemToBytes(credentials.private_key),
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const signature = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5',
+    key,
+    new TextEncoder().encode(unsigned),
+  );
+
+  const assertion = `${unsigned}.${base64urlBytes(new Uint8Array(signature))}`;
+
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Google token exchange failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  _tokenCache = {
+    token: data.access_token,
+    expiresAt: Date.now() + (data.expires_in ?? 3600) * 1000,
+  };
+  return _tokenCache.token;
+}
+
+/**
+ * Per-isolate access token cache.
+ *
+ * Workers reuse an isolate across requests, so this saves a round trip on most
+ * calls. It is not shared between isolates, which is fine — the worst case is
+ * fetching a token that another isolate already has.
+ */
+let _tokenCache = null;
+
+function base64url(text) {
+  return base64urlBytes(new TextEncoder().encode(text));
+}
+
+function base64urlBytes(bytes) {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/** Strips the PEM armour and newlines, leaving the DER bytes WebCrypto wants. */
+function pemToBytes(pem) {
+  const body = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/, '')
+    .replace(/-----END PRIVATE KEY-----/, '')
+    .replace(/\s+/g, '');
+  const binary = atob(body);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
