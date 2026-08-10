@@ -421,7 +421,7 @@ footer a:hover{color:var(--cyan)}
 <nav class="nav">
   <span class="nav__mark">VOIX</span>
   <span class="nav__links">
-    <a href="#try">Try it</a>
+    <a href="#try">Demo</a>
     <a href="#inside">What you get</a>
     <a href="#pricing">Pricing</a>
     <a href="#faq">FAQ</a>
@@ -440,7 +440,7 @@ footer a:hover{color:var(--cyan)}
       upgrades your vocabulary, and explains <em>why</em> — not just <em>what</em>.</p>
     <div class="cta reveal">
       <a class="btn btn--gold" href="#pricing">Get Pro — ₹9 for a week</a>
-      <a class="btn btn--ghost" href="#try">Try it free</a>
+      <a class="btn btn--ghost" href="#try">See how it corrects you</a>
     </div>
     <p class="hero__meta reveal">
       <span>Works offline</span><span>No ads</span><span>Corrections in real time</span>
@@ -452,15 +452,16 @@ footer a:hover{color:var(--cyan)}
 <!-- ══ TRY ════════════════════════════════════════════════════ -->
 <section id="try">
   <div class="head reveal">
-    <p class="eyebrow">Try it — no sign-up</p>
-    <h2>Say something wrong on purpose</h2>
-    <p class="lede">This is the same correction engine that runs inside the app, on your
-      phone, with no internet. Type a sentence and watch it get fixed.</p>
+    <p class="eyebrow">Live demo — nothing to install</p>
+    <h2>Type a sentence. Watch it get fixed.</h2>
+    <p class="lede">This is the same grammar engine that runs inside the app, on your
+      phone, with no internet. Write English with a mistake in it and the correction appears
+      as you type — with the reason underneath.</p>
   </div>
 
   <div class="panel corrector reveal">
-    <label for="input">Your sentence</label>
-    <textarea id="input" spellcheck="false" placeholder="Type a sentence…">Did you went there? I have a doubt about the meeting.</textarea>
+    <label for="input">Write an English sentence with a mistake</label>
+    <textarea id="input" spellcheck="false" placeholder="e.g. He go to school everyday">Did you went there? He go to office everyday.</textarea>
     <div class="chips" id="chips"></div>
     <div class="result" id="result"></div>
     <p class="corrector__note">It knows when to stay quiet, too — “I doubt it will rain” is
