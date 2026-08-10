@@ -3,561 +3,384 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Voix — your personal AI language tutor</title>
-<meta name="description" content="Voix teaches you to speak confidently by having real conversations with an AI tutor that corrects your grammar, upgrades your vocabulary, and explains why. Flutter, on-device, offline.">
+<title>Voix Pro — speak English with confidence</title>
+<meta name="description" content="Voix is your personal AI language tutor. It corrects your grammar, upgrades your vocabulary and explains why. Get Pro from ₹9 a week.">
+</head>
+<body>
+
 <style>
 /* ───────────────────────────────────────────────────────────────
-   Aurora. Dark saturated mesh gradient, the app's own brand ramp
-   (#22D8F0 → #3B7BFF → #8B5CF6), oversized display type, neon glow.
-   Type is a system stack — the page loads no fonts over the network.
+   Aurora, on the app's own brand ramp (#22D8F0 → #3B7BFF → #8B5CF6),
+   with Pro in the app's gold. Type is a system stack; nothing loads
+   over the network.
+
+   Performance note: backdrop-filter is the single most expensive
+   thing on a scrolling page, so it is spent on four surfaces only —
+   the nav, the email gate, and the two plan cards. Every other
+   "glass" surface is a plain gradient panel, which is visually
+   identical over a dark ground and costs nothing to scroll.
    ─────────────────────────────────────────────────────────────── */
 :root{
   --bg:#04060F;
-  --bg-alt:#070B1A;
   --cyan:#22D8F0;
   --blue:#3B7BFF;
-  --indigo:#5B5BFF;
   --violet:#8B5CF6;
   --magenta:#EC4899;
-  --text:#F2F5FF;
-  --text-2:#9AA6C7;
-  --text-3:#64719A;
-  --glass:rgba(255,255,255,.055);
-  --glass-line:rgba(255,255,255,.10);
-  /* Pro is gold in the app (AppColors.gold / VoixGradients.gold) — same here. */
   --gold:#FFC53D;
   --gold-1:#FFD873;
   --gold-2:#E8A020;
+  --text:#F2F5FF;
+  --text-2:#9AA6C7;
+  --text-3:#64719A;
+  --line:rgba(255,255,255,.09);
+  --line-2:rgba(255,255,255,.16);
+  --panel:linear-gradient(158deg, rgba(255,255,255,.062), rgba(255,255,255,.018));
   --ui:system-ui, -apple-system, "Segoe UI", Roboto, Inter, "Helvetica Neue", sans-serif;
   --mono:ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   --spring:cubic-bezier(.22,1.2,.36,1);
   --ease:cubic-bezier(.4,0,.2,1);
+  --wrap:1120px;
 }
 
 *{box-sizing:border-box}
-html{
-  scroll-behavior:smooth;
-  -webkit-text-size-adjust:100%;
-}
+html{scroll-behavior:smooth; -webkit-text-size-adjust:100%; scroll-padding-top:6rem}
 body{
   margin:0;
-  min-height:100%;
   font-family:var(--ui);
   color:var(--text);
   background:var(--bg);
+  line-height:1.6;
   overflow-x:hidden;
   -webkit-font-smoothing:antialiased;
-  line-height:1.6;
 }
 
-/* The mesh gradient is the primary surface feature, not a backdrop. */
 .mesh{
   position:fixed; inset:0; z-index:0; pointer-events:none;
   background:
-    radial-gradient(58% 48% at 14% 8%,  rgba(59,123,255,.34), transparent 62%),
-    radial-gradient(52% 44% at 88% 12%, rgba(139,92,246,.32), transparent 62%),
-    radial-gradient(60% 52% at 74% 88%, rgba(236,72,153,.20), transparent 62%),
-    radial-gradient(52% 44% at 12% 84%, rgba(34,216,240,.18), transparent 62%),
+    radial-gradient(58% 48% at 14% 6%,  rgba(59,123,255,.32), transparent 62%),
+    radial-gradient(52% 44% at 88% 14%, rgba(139,92,246,.30), transparent 62%),
+    radial-gradient(60% 52% at 76% 86%, rgba(236,72,153,.18), transparent 62%),
+    radial-gradient(52% 44% at 10% 82%, rgba(34,216,240,.16), transparent 62%),
     var(--bg);
 }
-/* Three oversized blooms, drifting. The app paints the same idea in one
-   layer rather than stacking blur filters; here they are cheap and fixed. */
 .bloom{
   position:fixed; z-index:0; pointer-events:none;
-  border-radius:50%;
-  filter:blur(90px);
-  opacity:.5;
+  border-radius:50%; filter:blur(64px); opacity:.42;
   will-change:transform;
 }
-.bloom--1{width:46vw; height:46vw; left:-8vw;  top:2vh;  background:radial-gradient(circle, rgba(59,123,255,.55), transparent 70%)}
-.bloom--2{width:40vw; height:40vw; right:-6vw; top:26vh; background:radial-gradient(circle, rgba(139,92,246,.50), transparent 70%)}
-.bloom--3{width:52vw; height:52vw; left:22vw;  top:64vh; background:radial-gradient(circle, rgba(236,72,153,.34), transparent 70%)}
-
-/* Film grain, keeps the gradients from banding. */
+.bloom--1{width:38vw; height:38vw; left:-6vw; top:4vh;  background:radial-gradient(circle, rgba(59,123,255,.5), transparent 70%)}
+.bloom--2{width:34vw; height:34vw; right:-4vw; top:24vh; background:radial-gradient(circle, rgba(139,92,246,.46), transparent 70%)}
+.past-hero .bloom{visibility:hidden}
 .grain{
-  position:fixed; inset:0; z-index:1; pointer-events:none; opacity:.16;
+  position:fixed; inset:0; z-index:1; pointer-events:none; opacity:.14;
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='.42'/></svg>");
 }
-
-#scene{
-  position:fixed; inset:0; z-index:2;
-  pointer-events:none;
-  opacity:0;
-  transition:opacity 900ms var(--ease);
-}
-#scene.ready{opacity:1}
-
+#scene{position:fixed; inset:0; z-index:2; pointer-events:none; opacity:0}
 .page{position:relative; z-index:3}
 
 /* ── Type ───────────────────────────────────────────────────── */
-h1,h2,h3{margin:0; line-height:1.04; letter-spacing:-.035em; font-weight:650}
+h1,h2,h3{margin:0; line-height:1.05; letter-spacing:-.035em; font-weight:650; text-wrap:balance}
 .display{
-  font-size:clamp(4.5rem, 18vw, 17rem);
-  font-weight:800;
-  letter-spacing:-.06em;
-  line-height:.86;
-  background:linear-gradient(96deg, var(--cyan) 0%, var(--blue) 34%, var(--violet) 68%, var(--magenta) 100%);
-  -webkit-background-clip:text;
-  background-clip:text;
-  color:transparent;
-  filter:drop-shadow(0 0 42px rgba(91,91,255,.45));
+  font-size:clamp(3.6rem, 13vw, 11rem);
+  font-weight:800; letter-spacing:-.06em; line-height:.88;
+  background:linear-gradient(96deg, var(--cyan) 0%, var(--blue) 36%, var(--violet) 70%, var(--magenta) 100%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  filter:drop-shadow(0 0 38px rgba(91,91,255,.4));
 }
-h2{font-size:clamp(2rem, 4.6vw, 3.5rem)}
-h3{font-size:1.08rem; letter-spacing:-.015em; font-weight:600}
+h2{font-size:clamp(1.9rem, 4vw, 3rem)}
+h3{font-size:1.05rem; font-weight:600; letter-spacing:-.015em}
 p{margin:0 0 1rem}
 a{color:inherit}
-
 .eyebrow{
-  font-family:var(--mono);
-  font-size:.72rem;
-  letter-spacing:.22em;
-  text-transform:uppercase;
-  color:var(--cyan);
-  margin:0 0 1.1rem;
-  text-shadow:0 0 20px rgba(34,216,240,.55);
+  font-family:var(--mono); font-size:.7rem; letter-spacing:.2em;
+  text-transform:uppercase; color:var(--cyan); margin:0 0 .9rem;
 }
-.lede{font-size:clamp(1.02rem,1.5vw,1.2rem); color:var(--text-2); max-width:56ch}
-.muted{color:var(--text-2)}
+.eyebrow--gold{color:var(--gold)}
+.lede{font-size:clamp(1rem,1.4vw,1.15rem); color:var(--text-2); max-width:58ch}
 .mono{font-family:var(--mono)}
+.muted{color:var(--text-2)}
 
 section{
   position:relative;
-  max-width:1180px;
+  max-width:var(--wrap);
   margin:0 auto;
-  padding:clamp(5rem,11vw,10rem) clamp(1.15rem,4vw,2.5rem);
+  padding:clamp(4.5rem,9vw,8rem) clamp(1.15rem,4vw,2.5rem);
 }
-.section-head{margin-bottom:clamp(2.4rem,5vw,4rem); max-width:62ch}
+.head{margin-bottom:clamp(2rem,4vw,3.2rem); max-width:60ch}
+.divider{max-width:var(--wrap); margin:0 auto; padding:0 clamp(1.15rem,4vw,2.5rem)}
+.divider hr{border:0; border-top:1px solid var(--line); margin:0}
+
+/* ── Surfaces ───────────────────────────────────────────────── */
+.panel{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:18px;
+}
+/* Only these four surfaces pay for a backdrop blur. */
+.frost{
+  background:rgba(10,14,30,.5);
+  border:1px solid var(--line);
+  border-radius:18px;
+  backdrop-filter:blur(18px);
+  -webkit-backdrop-filter:blur(18px);
+}
 
 /* ── Nav ────────────────────────────────────────────────────── */
 .nav{
-  position:fixed; z-index:20;
-  top:.9rem; left:50%;
+  position:fixed; z-index:20; top:.85rem; left:50%;
   transform:translateX(-50%);
-  display:flex; align-items:center; gap:.35rem;
-  padding:.4rem .45rem .4rem .95rem;
+  display:flex; align-items:center; gap:.3rem;
+  padding:.38rem .42rem .38rem .95rem;
   border-radius:999px;
-  background:rgba(10,14,30,.55);
-  border:1px solid var(--glass-line);
-  backdrop-filter:blur(20px) saturate(150%);
-  -webkit-backdrop-filter:blur(20px) saturate(150%);
-  box-shadow:0 12px 40px rgba(0,0,0,.45);
+  background:rgba(10,14,30,.6);
+  border:1px solid var(--line);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  box-shadow:0 12px 40px rgba(0,0,0,.5);
   max-width:calc(100vw - 1.6rem);
 }
 .nav__mark{
-  font-weight:800; letter-spacing:-.04em; font-size:1.02rem;
-  margin-right:.7rem;
+  font-weight:800; letter-spacing:-.04em; font-size:1rem; margin-right:.6rem;
   background:linear-gradient(100deg,var(--cyan),var(--violet));
   -webkit-background-clip:text; background-clip:text; color:transparent;
 }
 .nav a{
-  font-size:.86rem; color:var(--text-2); text-decoration:none;
-  padding:.42rem .72rem; border-radius:999px;
-  transition:color 220ms var(--ease), background 220ms var(--ease);
-  white-space:nowrap;
+  font-size:.85rem; color:var(--text-2); text-decoration:none;
+  padding:.4rem .68rem; border-radius:999px; white-space:nowrap;
+  transition:color 200ms var(--ease), background 200ms var(--ease);
 }
 .nav a:hover{color:var(--text); background:rgba(255,255,255,.07)}
-.nav .btn{margin-left:.3rem}
-@media (max-width:720px){ .nav__links{display:none} }
+@media (max-width:760px){ .nav__links{display:none} }
 
 /* ── Buttons ────────────────────────────────────────────────── */
 .btn{
-  --glow:rgba(59,123,255,.5);
-  position:relative;
-  display:inline-flex; align-items:center; gap:.5rem;
-  padding:.78rem 1.35rem;
-  border-radius:999px;
-  font-size:.92rem; font-weight:600;
-  text-decoration:none;
+  --glow:rgba(59,123,255,.45);
+  display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+  padding:.8rem 1.4rem; border-radius:999px;
+  font-size:.93rem; font-weight:600; text-decoration:none;
   border:1px solid transparent;
   background:linear-gradient(100deg,var(--blue),var(--violet));
   color:#fff;
-  box-shadow:0 8px 30px var(--glow);
-  transition:transform 320ms var(--spring), box-shadow 320ms var(--ease), filter 320ms var(--ease);
-  overflow:hidden;
+  box-shadow:0 8px 28px var(--glow);
+  transition:transform 300ms var(--spring), box-shadow 300ms var(--ease);
+  cursor:pointer;
 }
-.btn::after{  /* sheen sweep on hover */
-  content:"";
-  position:absolute; inset:0;
-  background:linear-gradient(105deg, transparent 30%, rgba(255,255,255,.32) 50%, transparent 70%);
-  transform:translateX(-120%);
-  transition:transform 700ms var(--ease);
-}
-.btn:hover{transform:translateY(-3px); box-shadow:0 14px 44px var(--glow); filter:saturate(115%)}
-.btn:hover::after{transform:translateX(120%)}
+.btn:hover{transform:translateY(-3px); box-shadow:0 14px 40px var(--glow)}
+.btn:focus-visible{outline:2px solid var(--cyan); outline-offset:3px}
 .btn--ghost{
-  background:var(--glass);
-  border-color:var(--glass-line);
-  color:var(--text);
-  box-shadow:none;
-  backdrop-filter:blur(14px);
-  -webkit-backdrop-filter:blur(14px);
+  background:rgba(255,255,255,.05); border-color:var(--line-2);
+  color:var(--text); box-shadow:none;
 }
-.btn--ghost:hover{background:rgba(255,255,255,.10); box-shadow:0 10px 34px rgba(0,0,0,.4)}
-.btn--sm{padding:.5rem .95rem; font-size:.83rem}
-
-/* ── Glass ──────────────────────────────────────────────────── */
-.glass{
-  position:relative;
-  background:linear-gradient(158deg, rgba(255,255,255,.075), rgba(255,255,255,.018));
-  border:1px solid var(--glass-line);
-  border-radius:20px;
-  backdrop-filter:blur(18px) saturate(140%);
-  -webkit-backdrop-filter:blur(18px) saturate(140%);
-  transition:transform 420ms var(--spring), border-color 320ms var(--ease), box-shadow 420ms var(--ease);
+.btn--ghost:hover{background:rgba(255,255,255,.1); box-shadow:none}
+.btn--sm{padding:.48rem .92rem; font-size:.82rem}
+.btn--gold, .nav a.btn--gold{
+  --glow:rgba(232,160,32,.38);
+  background:linear-gradient(135deg,var(--gold-1),var(--gold-2));
+  color:#2A1C00; font-weight:700;
 }
-/* Gradient hairline that lights up on hover. */
-.glass::before{
-  content:"";
-  position:absolute; inset:-1px;
-  border-radius:inherit;
-  padding:1px;
-  background:linear-gradient(140deg, rgba(34,216,240,.55), rgba(139,92,246,.45), transparent 65%);
-  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite:xor; mask-composite:exclude;
-  opacity:0;
-  transition:opacity 380ms var(--ease);
-  pointer-events:none;
-}
-.glass:hover::before{opacity:1}
+.nav a.btn--gold:hover{color:#2A1C00}
+.btn.is-locked{opacity:.4; filter:saturate(.3); cursor:not-allowed}
+.btn.is-locked:hover{transform:none}
 
 /* ── Hero ───────────────────────────────────────────────────── */
-.hero{
-  min-height:100svh;
-  display:flex; align-items:center;
-  padding-top:7rem; padding-bottom:4rem;
-  max-width:1180px;
-}
-.hero__inner{width:100%; max-width:44rem}
-.hero__sub{font-size:clamp(1.05rem,1.7vw,1.35rem); color:var(--text-2); max-width:38ch; margin:1.5rem 0 2.2rem}
+.hero{min-height:100svh; display:flex; align-items:center; padding-top:7rem; padding-bottom:4rem}
+.hero__inner{width:100%; max-width:40rem}
+.hero__sub{font-size:clamp(1.02rem,1.6vw,1.28rem); color:var(--text-2); max-width:36ch; margin:1.4rem 0 2rem}
 .hero__sub em{color:var(--text); font-style:italic}
-.hero__cta{display:flex; flex-wrap:wrap; gap:.8rem}
-.hero__stats{
-  display:flex; flex-wrap:wrap; gap:2.4rem;
-  margin-top:3.4rem; padding-top:1.8rem;
-  border-top:1px solid rgba(255,255,255,.08);
+.cta{display:flex; flex-wrap:wrap; gap:.75rem}
+.hero__meta{
+  display:flex; flex-wrap:wrap; gap:.5rem 1.5rem; margin-top:2.4rem;
+  font-family:var(--mono); font-size:.74rem; color:var(--text-3);
 }
-.hero__stats b{
-  display:block; font-size:1.85rem; font-weight:700; letter-spacing:-.03em;
-  background:linear-gradient(100deg,var(--cyan),var(--violet));
-  -webkit-background-clip:text; background-clip:text; color:transparent;
-}
-.hero__stats span{font-family:var(--mono); font-size:.7rem; letter-spacing:.13em; text-transform:uppercase; color:var(--text-3)}
-
-.scroll-cue{
-  position:absolute; left:50%; bottom:1.8rem; transform:translateX(-50%);
-  font-family:var(--mono); font-size:.66rem; letter-spacing:.2em; text-transform:uppercase;
-  color:var(--text-3); display:flex; flex-direction:column; align-items:center; gap:.55rem;
-}
-.scroll-cue i{
-  display:block; width:1px; height:38px;
-  background:linear-gradient(var(--cyan), transparent);
-  animation:cue 2.4s var(--ease) infinite;
-}
-@keyframes cue{0%{opacity:0; transform:scaleY(.3)}40%{opacity:1}100%{opacity:0; transform:scaleY(1) translateY(14px)}}
 
 /* ── Corrector ──────────────────────────────────────────────── */
-.corrector{padding:clamp(1.4rem,3vw,2.2rem)}
-.corrector__field{position:relative}
+.corrector{padding:clamp(1.3rem,2.6vw,2rem)}
+.corrector label{
+  font-family:var(--mono); font-size:.68rem; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--text-3); display:block; margin-bottom:.55rem;
+}
 .corrector textarea{
-  width:100%;
-  min-height:96px;
-  resize:vertical;
-  background:rgba(4,6,15,.55);
-  border:1px solid var(--glass-line);
-  border-radius:14px;
-  color:var(--text);
-  font-family:var(--ui);
-  font-size:clamp(1rem,1.6vw,1.22rem);
-  line-height:1.5;
-  padding:1rem 1.1rem;
-  outline:none;
-  transition:border-color 260ms var(--ease), box-shadow 260ms var(--ease);
+  width:100%; min-height:88px; resize:vertical;
+  background:rgba(4,6,15,.5); border:1px solid var(--line);
+  border-radius:13px; color:var(--text);
+  font-family:var(--ui); font-size:clamp(1rem,1.5vw,1.18rem); line-height:1.5;
+  padding:.95rem 1.05rem; outline:none;
+  transition:border-color 240ms var(--ease);
 }
-.corrector textarea:focus{
-  border-color:rgba(34,216,240,.6);
-  box-shadow:0 0 0 4px rgba(34,216,240,.12);
-}
-.chips{display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.9rem}
+.corrector textarea:focus{border-color:rgba(34,216,240,.6)}
+.chips{display:flex; flex-wrap:wrap; gap:.45rem; margin-top:.85rem}
 .chip{
-  font-family:var(--mono); font-size:.74rem;
-  padding:.36rem .72rem; border-radius:999px;
-  background:rgba(255,255,255,.05);
-  border:1px solid var(--glass-line);
-  color:var(--text-2);
-  cursor:pointer;
-  transition:transform 260ms var(--spring), color 220ms var(--ease), border-color 220ms var(--ease), background 220ms var(--ease);
+  font-family:var(--mono); font-size:.73rem;
+  padding:.34rem .68rem; border-radius:999px;
+  background:rgba(255,255,255,.045); border:1px solid var(--line);
+  color:var(--text-2); cursor:pointer;
+  transition:color 200ms var(--ease), border-color 200ms var(--ease);
 }
-.chip:hover{color:var(--text); border-color:rgba(34,216,240,.5); background:rgba(34,216,240,.10); transform:translateY(-2px)}
-
-.result{margin-top:1.5rem; min-height:120px}
-.result__line{font-size:clamp(1.05rem,1.8vw,1.35rem); line-height:1.45; margin-bottom:.9rem}
+.chip:hover{color:var(--text); border-color:rgba(34,216,240,.5)}
+.chip:focus-visible{outline:2px solid var(--cyan); outline-offset:2px}
+.result{margin-top:1.4rem; min-height:104px}
+.result__line{font-size:clamp(1.05rem,1.7vw,1.3rem); line-height:1.45; margin-bottom:.8rem}
 .result__line del{color:var(--text-3); text-decoration:line-through; text-decoration-color:var(--magenta)}
-.result__line ins{
-  text-decoration:none; color:var(--cyan);
-  text-shadow:0 0 18px rgba(34,216,240,.5);
-}
-.result__why{display:grid; gap:.6rem; margin-top:1.1rem}
+.result__line ins{text-decoration:none; color:var(--cyan)}
+.result__why{display:grid; gap:.5rem; margin:1rem 0 0; padding:0}
 .result__why li{
-  list-style:none;
-  display:grid; grid-template-columns:auto minmax(0,1fr); gap:.7rem; align-items:start;
-  font-size:.9rem; color:var(--text-2);
-  padding:.7rem .85rem;
-  border-radius:12px;
-  background:rgba(255,255,255,.035);
-  border:1px solid rgba(255,255,255,.07);
-  animation:rise 460ms var(--spring) both;
+  list-style:none; display:grid; grid-template-columns:auto minmax(0,1fr);
+  gap:.65rem; align-items:start;
+  font-size:.88rem; color:var(--text-2);
+  padding:.65rem .8rem; border-radius:11px;
+  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06);
+  animation:rise 420ms var(--spring) both;
 }
 .pill{
-  font-family:var(--mono); font-size:.62rem; letter-spacing:.1em; text-transform:uppercase;
-  padding:.22rem .5rem; border-radius:999px; white-space:nowrap;
-  border:1px solid currentColor;
+  font-family:var(--mono); font-size:.61rem; letter-spacing:.1em;
+  text-transform:uppercase; padding:.2rem .48rem; border-radius:999px;
+  white-space:nowrap; border:1px solid currentColor;
 }
 .pill--grammar{color:var(--cyan)}
 .pill--vocabulary{color:var(--violet)}
 .pill--phrasing{color:var(--magenta)}
-.result__clean{
-  display:flex; align-items:center; gap:.6rem;
-  font-size:1rem; color:var(--text-2);
-}
+.result__clean{font-size:.98rem; color:var(--text-2)}
 .result__clean b{color:#4ADE80; font-weight:600}
-@keyframes rise{from{opacity:0; transform:translateY(10px)}to{opacity:1; transform:none}}
-.result__note{font-family:var(--mono); font-size:.71rem; color:var(--text-3); margin-top:1.2rem; line-height:1.6}
+@keyframes rise{from{opacity:0; transform:translateY(8px)}to{opacity:1; transform:none}}
+.corrector__note{font-family:var(--mono); font-size:.7rem; color:var(--text-3); margin:1.1rem 0 0; line-height:1.6}
 
-/* ── Grids ──────────────────────────────────────────────────── */
-.grid{display:grid; gap:1.1rem}
-.grid--3{grid-template-columns:repeat(auto-fit, minmax(270px,1fr))}
-.grid--4{grid-template-columns:repeat(auto-fill, minmax(232px,1fr))}
-.card{padding:1.5rem 1.4rem; height:100%}
-.card:hover{transform:translateY(-6px); border-color:rgba(255,255,255,.18); box-shadow:0 22px 60px rgba(0,0,0,.5)}
-.card h3{margin-bottom:.55rem}
-.card p{color:var(--text-2); font-size:.92rem; margin:0}
-.card__n{
-  font-family:var(--mono); font-size:.68rem; color:var(--text-3);
-  letter-spacing:.12em; display:block; margin-bottom:.9rem;
-}
-.tag{
-  display:inline-block; font-family:var(--mono); font-size:.6rem;
-  letter-spacing:.12em; text-transform:uppercase;
-  padding:.2rem .5rem; border-radius:999px; margin-bottom:.7rem;
-  color:var(--magenta); border:1px solid rgba(236,72,153,.45);
-  background:rgba(236,72,153,.10);
-}
-
-/* Lessons list */
-.lessons{display:grid; gap:0; margin-top:2.4rem; border-top:1px solid rgba(255,255,255,.08)}
-.lessons li{
-  list-style:none;
-  display:grid; grid-template-columns:3rem minmax(0,1.1fr) minmax(0,1fr);
+/* ── Catalogue ──────────────────────────────────────────────── */
+.cols{display:grid; gap:clamp(1.5rem,3vw,2.6rem); grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.list{list-style:none; padding:0; margin:1.2rem 0 0; border-top:1px solid var(--line)}
+.list li{
+  display:grid; grid-template-columns:minmax(0,1fr) auto;
   gap:1rem; align-items:baseline;
-  padding:1.05rem .6rem;
-  border-bottom:1px solid rgba(255,255,255,.07);
-  transition:background 300ms var(--ease), padding-left 320ms var(--spring);
+  padding:.72rem .1rem;
+  border-bottom:1px solid rgba(255,255,255,.055);
 }
-.lessons li:hover{background:rgba(255,255,255,.04); padding-left:1.3rem}
-.lessons .n{font-family:var(--mono); font-size:.76rem; color:var(--text-3)}
-.lessons .t{font-size:1.02rem; font-weight:550}
-.lessons .s{font-size:.88rem; color:var(--text-2)}
-@media (max-width:700px){
-  .lessons li{grid-template-columns:2.4rem minmax(0,1fr)}
-  .lessons .s{grid-column:2}
+.list b{font-weight:500; font-size:.97rem}
+.list small{display:block; color:var(--text-3); font-size:.8rem; margin-top:.1rem}
+.free{font-family:var(--mono); font-size:.64rem; letter-spacing:.1em; text-transform:uppercase; color:var(--text-3)}
+.pro{
+  font-family:var(--mono); font-size:.64rem; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--gold); border:1px solid rgba(255,197,61,.4);
+  background:rgba(255,197,61,.09); padding:.16rem .45rem; border-radius:999px;
 }
-
-/* Stack chips */
-.stack{display:flex; flex-wrap:wrap; gap:.6rem; margin-top:2rem}
-.stack span{
-  font-family:var(--mono); font-size:.8rem;
-  padding:.52rem .9rem; border-radius:999px;
-  background:rgba(255,255,255,.045);
-  border:1px solid var(--glass-line);
-  color:var(--text-2);
-  transition:transform 300ms var(--spring), color 240ms var(--ease), border-color 240ms var(--ease);
+.count{
+  font-family:var(--mono); font-size:.72rem; color:var(--text-3);
+  margin:.9rem 0 0;
 }
-.stack span:hover{transform:translateY(-3px); color:var(--text); border-color:rgba(139,92,246,.55)}
-
-/* Flow diagram */
-.flow{
-  display:flex; flex-wrap:wrap; align-items:center; gap:.7rem;
-  font-family:var(--mono); font-size:.86rem; margin-top:1.6rem;
-}
-.flow b{
-  font-weight:400; padding:.5rem .85rem; border-radius:10px;
-  background:rgba(255,255,255,.05); border:1px solid var(--glass-line);
-}
-.flow i{color:var(--text-3); font-style:normal}
 
 /* ── Pricing ────────────────────────────────────────────────── */
-.plans{
-  display:grid; gap:1.3rem;
-  grid-template-columns:repeat(auto-fit, minmax(288px,1fr));
-  margin-top:2.6rem;
-  align-items:stretch;
-}
-.plan{padding:1.9rem 1.7rem; display:flex; flex-direction:column}
-.plan:hover{transform:translateY(-6px); border-color:rgba(255,255,255,.18); box-shadow:0 22px 60px rgba(0,0,0,.5)}
-.plan--gold{
-  border-color:rgba(255,197,61,.42);
-  box-shadow:0 0 0 1px rgba(255,197,61,.10), 0 18px 60px rgba(232,160,32,.14);
-}
-.plan--gold::before{
-  background:linear-gradient(140deg, rgba(255,216,115,.75), rgba(232,160,32,.35), transparent 68%);
-}
-.plan--gold:hover{border-color:rgba(255,197,61,.7); box-shadow:0 26px 70px rgba(232,160,32,.24)}
-
-.plan__ribbon{
-  align-self:flex-start;
-  font-family:var(--mono); font-size:.62rem; letter-spacing:.14em; text-transform:uppercase;
-  padding:.3rem .62rem; border-radius:999px; margin-bottom:1rem;
-  color:#2A1C00; font-weight:700;
-  background:linear-gradient(135deg, var(--gold-1), var(--gold-2));
-}
-.plan__ribbon--plain{
-  background:none; color:var(--text-3); font-weight:400;
-  border:1px solid var(--glass-line);
-}
-.plan__name{font-size:1.12rem; font-weight:650; margin-bottom:.15rem}
-.plan__for{font-size:.86rem; color:var(--text-2); margin-bottom:1.3rem}
-.plan__price{display:flex; align-items:baseline; gap:.45rem; margin-bottom:.4rem}
-.plan__price b{
-  font-size:clamp(2.6rem,5vw,3.5rem); font-weight:800; letter-spacing:-.045em; line-height:1;
-  font-variant-numeric:tabular-nums;
-}
-.plan--gold .plan__price b{
-  background:linear-gradient(135deg, var(--gold-1), var(--gold-2));
-  -webkit-background-clip:text; background-clip:text; color:transparent;
-}
-.plan__price span{font-size:.95rem; color:var(--text-2)}
-.plan__equiv{font-family:var(--mono); font-size:.72rem; color:var(--text-3); margin-bottom:1.5rem}
-.plan .btn{width:100%; justify-content:center; margin-top:auto}
-/* `.nav a` also sets a colour, so this needs the extra specificity to win. */
-.btn--gold, .nav a.btn--gold{
-  --glow:rgba(232,160,32,.42);
-  background:linear-gradient(135deg, var(--gold-1), var(--gold-2));
-  color:#2A1C00;
-  font-weight:700;
-}
-.nav a.btn--gold:hover{background:linear-gradient(135deg, #FFE08F, #F2AB2A); color:#2A1C00}
-.plan__note{
-  font-family:var(--mono); font-size:.68rem; color:var(--text-3);
-  margin:.9rem 0 0; text-align:center; line-height:1.5;
-}
-
-.perks{list-style:none; padding:0; margin:0 0 1.7rem; display:grid; gap:.85rem}
-.perks li{display:grid; grid-template-columns:1.35rem minmax(0,1fr); gap:.7rem; align-items:start}
-.perks svg{width:1.1rem; height:1.1rem; margin-top:.18rem; flex:none}
-.perks b{display:block; font-size:.93rem; font-weight:600}
-.perks span{font-size:.83rem; color:var(--text-2)}
-
-.locked{
-  margin-top:2.6rem; padding:1.4rem 1.5rem;
-  display:grid; gap:.55rem;
-}
-.locked h3{margin-bottom:.4rem}
-.locked ul{list-style:none; padding:0; margin:0; display:flex; flex-wrap:wrap; gap:.5rem}
-.locked li{
-  font-family:var(--mono); font-size:.76rem;
-  padding:.4rem .75rem; border-radius:999px;
-  border:1px solid rgba(255,197,61,.32);
-  background:rgba(255,197,61,.08);
-  color:var(--gold);
-}
-
-/* ── Account gate ───────────────────────────────────────────── */
-.gate{padding:1.5rem 1.6rem; margin-top:2.2rem; display:grid; gap:.75rem}
-.gate__label{
-  font-family:var(--mono); font-size:.7rem; letter-spacing:.14em;
-  text-transform:uppercase; color:var(--gold);
-}
+.gate{padding:1.4rem 1.5rem; display:grid; gap:.7rem; margin-bottom:1.3rem}
+.gate__label{font-family:var(--mono); font-size:.68rem; letter-spacing:.14em; text-transform:uppercase; color:var(--gold)}
 .gate input{
-  width:100%;
-  background:rgba(4,6,15,.55);
-  border:1px solid var(--glass-line);
-  border-radius:12px;
-  color:var(--text);
-  font-family:var(--ui); font-size:1.02rem;
-  padding:.85rem 1rem;
-  outline:none;
-  transition:border-color 240ms var(--ease), box-shadow 240ms var(--ease);
+  width:100%; background:rgba(4,6,15,.5); border:1px solid var(--line);
+  border-radius:12px; color:var(--text); font-family:var(--ui); font-size:1rem;
+  padding:.82rem .95rem; outline:none;
+  transition:border-color 220ms var(--ease);
 }
 .gate input::placeholder{color:var(--text-3)}
-.gate input:focus{border-color:rgba(255,197,61,.65); box-shadow:0 0 0 4px rgba(255,197,61,.12)}
+.gate input:focus{border-color:rgba(255,197,61,.65)}
 .gate input:focus-visible{outline:2px solid var(--gold); outline-offset:2px}
-.gate__help{font-size:.85rem; color:var(--text-2); margin:0}
-.gate__err{
-  font-size:.85rem; color:#FF7A93; margin:0; display:none;
-}
+.gate__help{font-size:.84rem; color:var(--text-2); margin:0}
+.gate__err{font-size:.84rem; color:#FF7A93; margin:0; display:none}
 .gate.is-bad input{border-color:rgba(255,122,147,.7)}
 .gate.is-bad .gate__err{display:block}
-.gate.is-ok input{border-color:rgba(74,222,128,.5)}
+.gate.is-ok input{border-color:rgba(74,222,128,.45)}
 
-.btn.is-locked{opacity:.45; filter:saturate(.35); cursor:not-allowed}
-.btn.is-locked:hover{transform:none; box-shadow:0 8px 30px var(--glow)}
-
-/* ── State table ────────────────────────────────────────────── */
-.state{width:100%; border-collapse:collapse; margin-top:2.2rem; font-size:.94rem}
-.state th{
-  text-align:left; font-family:var(--mono); font-size:.66rem;
-  letter-spacing:.16em; text-transform:uppercase; color:var(--text-3);
-  padding:0 1rem .8rem; font-weight:400;
+.plans{display:grid; gap:1.1rem; grid-template-columns:repeat(auto-fit,minmax(282px,1fr)); align-items:stretch}
+.plan{padding:1.8rem 1.6rem; display:flex; flex-direction:column;
+  transition:transform 320ms var(--spring), border-color 260ms var(--ease)}
+.plan:hover{transform:translateY(-4px); border-color:var(--line-2)}
+.steps li, .faq details{transition:border-color 260ms var(--ease)}
+.steps li:hover, .faq details:hover{border-color:var(--line-2)}
+.plan--gold{border-color:rgba(255,197,61,.4); box-shadow:0 16px 50px rgba(232,160,32,.12)}
+.plan__tag{
+  align-self:flex-start; font-family:var(--mono); font-size:.61rem;
+  letter-spacing:.14em; text-transform:uppercase;
+  padding:.28rem .6rem; border-radius:999px; margin-bottom:.9rem;
+  color:#2A1C00; font-weight:700;
+  background:linear-gradient(135deg,var(--gold-1),var(--gold-2));
 }
-.state td{padding:.85rem 1rem; border-top:1px solid rgba(255,255,255,.07); vertical-align:top}
-.state tr{transition:background 260ms var(--ease)}
-.state tbody tr:hover{background:rgba(255,255,255,.035)}
-.state td:last-child{font-family:var(--mono); font-size:.78rem}
-.ok{color:#4ADE80}
-.wip{color:#FBBF24}
-.state-wrap{overflow-x:auto; margin:0 -1rem; padding:0 1rem}
-
-/* ── Code ───────────────────────────────────────────────────── */
-.code{
-  font-family:var(--mono); font-size:.84rem; line-height:1.85;
-  background:rgba(4,6,15,.6);
-  border:1px solid var(--glass-line);
-  border-radius:16px;
-  padding:1.2rem 1.3rem;
-  margin:0;
-  white-space:pre-wrap;
-  overflow-wrap:anywhere;
-  color:var(--text-2);
-  backdrop-filter:blur(14px);
-  -webkit-backdrop-filter:blur(14px);
+.plan__tag--plain{background:none; color:var(--text-3); font-weight:400; border:1px solid var(--line)}
+.plan__name{font-size:1.08rem; font-weight:650}
+.plan__for{font-size:.85rem; color:var(--text-2); margin:.1rem 0 1.2rem}
+.plan__price{display:flex; align-items:baseline; gap:.4rem; margin-bottom:.3rem}
+.plan__price b{
+  font-size:clamp(2.5rem,4.6vw,3.3rem); font-weight:800;
+  letter-spacing:-.045em; line-height:1; font-variant-numeric:tabular-nums;
 }
-.code b{color:var(--cyan); font-weight:400}
-.code i{color:var(--text-3); font-style:normal}
+.plan--gold .plan__price b{
+  background:linear-gradient(135deg,var(--gold-1),var(--gold-2));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.plan__price span{font-size:.92rem; color:var(--text-2)}
+.plan__sub{font-family:var(--mono); font-size:.71rem; color:var(--text-3); margin-bottom:1.4rem}
+.perks{list-style:none; padding:0; margin:0 0 1.6rem; display:grid; gap:.75rem}
+.perks li{display:grid; grid-template-columns:1.2rem minmax(0,1fr); gap:.65rem; align-items:start}
+.perks svg{width:1.05rem; height:1.05rem; margin-top:.2rem}
+.perks b{display:block; font-size:.91rem; font-weight:600}
+.perks span{font-size:.82rem; color:var(--text-2)}
+.plan .btn{width:100%; margin-top:auto}
+.plan__note{font-family:var(--mono); font-size:.67rem; color:var(--text-3); margin:.8rem 0 0; text-align:center}
 
-/* ── Contact ────────────────────────────────────────────────── */
-.contact{padding:clamp(2rem,5vw,3.6rem); text-align:center; overflow:hidden}
-.contact h2{margin-bottom:1rem}
-.contact .hero__cta{justify-content:center; margin-top:2rem}
+/* ── Steps ──────────────────────────────────────────────────── */
+.steps{
+  list-style:none; padding:0; margin:0;
+  display:grid; gap:1rem; grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+  counter-reset:step;
+}
+.steps li{padding:1.4rem 1.3rem; counter-increment:step}
+.steps li::before{
+  content:counter(step);
+  display:flex; align-items:center; justify-content:center;
+  width:2rem; height:2rem; border-radius:50%; margin-bottom:.9rem;
+  font-family:var(--mono); font-size:.85rem; font-weight:700;
+  color:#2A1C00; background:linear-gradient(135deg,var(--gold-1),var(--gold-2));
+}
+.steps h3{margin-bottom:.35rem}
+.steps p{font-size:.88rem; color:var(--text-2); margin:0}
 
+/* ── FAQ ────────────────────────────────────────────────────── */
+.faq{display:grid; gap:.7rem}
+.faq details{padding:0 1.3rem; border-radius:14px}
+.faq summary{
+  cursor:pointer; list-style:none; padding:1.05rem 0;
+  font-weight:600; font-size:.99rem;
+  display:flex; align-items:center; justify-content:space-between; gap:1rem;
+}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary:focus-visible{outline:2px solid var(--cyan); outline-offset:3px; border-radius:6px}
+.faq summary::after{
+  content:""; flex:none; width:.6rem; height:.6rem;
+  border-right:2px solid var(--text-3); border-bottom:2px solid var(--text-3);
+  transform:rotate(45deg); transition:transform 260ms var(--ease);
+}
+.faq details[open] summary::after{transform:rotate(-135deg)}
+.faq p{font-size:.91rem; color:var(--text-2); margin:0 0 1.15rem; max-width:64ch}
+
+/* ── Footer ─────────────────────────────────────────────────── */
 footer{
-  max-width:1180px; margin:0 auto;
-  padding:3rem clamp(1.15rem,4vw,2.5rem) 4rem;
-  border-top:1px solid rgba(255,255,255,.07);
-  display:flex; flex-wrap:wrap; gap:1.2rem; justify-content:space-between;
-  font-family:var(--mono); font-size:.74rem; color:var(--text-3);
+  max-width:var(--wrap); margin:0 auto;
+  padding:2.6rem clamp(1.15rem,4vw,2.5rem) 3.5rem;
+  border-top:1px solid var(--line);
+  display:flex; flex-wrap:wrap; gap:1rem 2rem; justify-content:space-between;
+  font-family:var(--mono); font-size:.73rem; color:var(--text-3);
 }
-footer a{color:var(--text-2); text-decoration:none; transition:color 220ms var(--ease)}
+footer a{color:var(--text-2); text-decoration:none}
 footer a:hover{color:var(--cyan)}
 
-/* ── Scroll reveal ──────────────────────────────────────────── */
-.reveal{opacity:0; transform:translateY(28px); transition:opacity 900ms var(--ease), transform 900ms var(--spring)}
+/* ── Reveal ─────────────────────────────────────────────────── */
+.reveal{opacity:0; transform:translateY(22px); transition:opacity 800ms var(--ease), transform 800ms var(--spring)}
 .reveal.in{opacity:1; transform:none}
 
 @media (prefers-reduced-motion: reduce){
   html{scroll-behavior:auto}
   .reveal{opacity:1; transform:none; transition:none}
-  .scroll-cue i{animation:none}
   .bloom{display:none}
-  *{transition-duration:.01ms !important}
+  *{transition-duration:.01ms !important; animation-duration:.01ms !important}
 }
 </style>
-</head>
-<body>
 
 <div class="mesh"></div>
 <div class="bloom bloom--1" data-depth="0.05"></div>
-<div class="bloom bloom--2" data-depth="0.09"></div>
-<div class="bloom bloom--3" data-depth="0.03"></div>
+<div class="bloom bloom--2" data-depth="0.08"></div>
 <canvas id="scene"></canvas>
 <div class="grain"></div>
 
@@ -565,9 +388,9 @@ footer a:hover{color:var(--cyan)}
   <span class="nav__mark">VOIX</span>
   <span class="nav__links">
     <a href="#try">Try it</a>
-    <a href="#engine">Engine</a>
-    <a href="#practice">Practice</a>
+    <a href="#inside">What you get</a>
     <a href="#pricing">Pricing</a>
+    <a href="#faq">FAQ</a>
   </span>
   <a class="btn btn--sm btn--gold" href="#pricing">Get Pro</a>
 </nav>
@@ -575,234 +398,130 @@ footer a:hover{color:var(--cyan)}
 <div class="page">
 
 <!-- ══ HERO ═══════════════════════════════════════════════════ -->
-<section class="hero">
+<section class="hero" id="top">
   <div class="hero__inner">
-    <p class="eyebrow reveal">Flutter · Riverpod · runs offline</p>
+    <p class="eyebrow reveal">Speak English with confidence</p>
     <h1 class="display reveal">VOIX</h1>
     <p class="hero__sub reveal">Your personal AI language tutor. It corrects your grammar,
       upgrades your vocabulary, and explains <em>why</em> — not just <em>what</em>.</p>
-    <div class="hero__cta reveal">
+    <div class="cta reveal">
       <a class="btn btn--gold" href="#pricing">Get Pro — ₹9 for a week</a>
-      <a class="btn btn--ghost" href="#try">Try the corrector</a>
+      <a class="btn btn--ghost" href="#try">Try it free</a>
     </div>
-    <div class="hero__stats reveal">
-      <div><b>14</b><span>Lessons</span></div>
-      <div><b>13</b><span>Scenarios</span></div>
-      <div><b>12</b><span>Achievements</span></div>
-      <div><b>52</b><span>Tests</span></div>
-    </div>
+    <p class="hero__meta reveal">
+      <span>Works offline</span><span>No ads</span><span>Corrections in real time</span>
+    </p>
   </div>
-  <div class="scroll-cue"><i></i>Scroll</div>
 </section>
 
-<!-- ══ CORRECTOR ══════════════════════════════════════════════ -->
+<!-- ══ TRY ════════════════════════════════════════════════════ -->
 <section id="try">
-  <div class="section-head reveal">
-    <p class="eyebrow">Live</p>
+  <div class="head reveal">
+    <p class="eyebrow">Try it — no sign-up</p>
     <h2>Say something wrong on purpose</h2>
-    <p class="lede">Every rule below is ported line for line from
-      <span class="mono">lib/data/services/grammar_engine.dart</span>. Same patterns, same
-      explanations, same one-correction-per-span ordering — running here in JavaScript
-      instead of Dart.</p>
+    <p class="lede">This is the same correction engine that runs inside the app, on your
+      phone, with no internet. Type a sentence and watch it get fixed.</p>
   </div>
 
-  <div class="glass corrector reveal">
-    <div class="corrector__field">
-      <label class="mono" style="font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--text-3);display:block;margin-bottom:.6rem">
-        Your sentence
-      </label>
-      <textarea id="input" spellcheck="false" placeholder="Type a sentence…">Did you went there? I have a doubt about the meeting.</textarea>
-    </div>
+  <div class="panel corrector reveal">
+    <label for="input">Your sentence</label>
+    <textarea id="input" spellcheck="false" placeholder="Type a sentence…">Did you went there? I have a doubt about the meeting.</textarea>
     <div class="chips" id="chips"></div>
     <div class="result" id="result"></div>
-    <p class="result__note">The app runs this on-device, which is what makes correction
-      real-time — there is no round trip between finishing a sentence and seeing the fix.</p>
+    <p class="corrector__note">It knows when to stay quiet, too — “I doubt it will rain” is
+      correct English, so nothing is flagged.</p>
   </div>
 </section>
 
-<!-- ══ ENGINE ═════════════════════════════════════════════════ -->
-<section id="engine">
-  <div class="section-head reveal">
-    <p class="eyebrow">How it works</p>
-    <h2>Three things worth knowing</h2>
+<div class="divider"><hr></div>
+
+<!-- ══ WHAT YOU GET ═══════════════════════════════════════════ -->
+<section id="inside">
+  <div class="head reveal">
+    <p class="eyebrow">What you get</p>
+    <h2>Thirteen conversations, fourteen lessons</h2>
+    <p class="lede">Most of it is free forever. Four are part of Pro — they are marked
+      below, so you know exactly what you are paying for.</p>
   </div>
 
-  <div class="grid grid--3">
-    <article class="glass card reveal" data-tilt>
-      <span class="card__n">01</span>
-      <h3>Correction runs on the device</h3>
-      <p>A rule engine covering the mistakes learners actually make: subject–verb agreement,
-        tense after <em>did</em>, articles by vowel <em>sound</em>, uncountable nouns, double
-        negatives, double comparatives, and a set of common Indian-English idioms. Rules are
-        ordered most-specific-first and each span is corrected at most once, so overlapping
-        rules cannot contradict each other.</p>
-    </article>
-    <article class="glass card reveal" data-tilt>
-      <span class="card__n">02</span>
-      <h3>The visuals are vectors, not assets</h3>
-      <p>The splash orb, the VOIX mark, the waveform, every chart and the level badge are
-        <span class="mono">CustomPainter</span>s. The app ships no raster art beyond the
-        launcher icon, so it stays crisp at every density and the mark can animate its own
-        stroke.</p>
-    </article>
-    <article class="glass card reveal" data-tilt>
-      <span class="card__n">03</span>
-      <h3>Voice degrades, never blocks</h3>
-      <p><span class="mono">SpeechService</span> guards every platform call. No recogniser, a
-        denied permission, or a plain emulator all resolve to the same outcome: the
-        conversation screen switches to typed input and says why. The core feature is never
-        unreachable.</p>
-    </article>
-  </div>
-</section>
-
-<!-- ══ PRACTICE ═══════════════════════════════════════════════ -->
-<section id="practice">
-  <div class="section-head reveal">
-    <p class="eyebrow">Practice</p>
-    <h2>Thirteen roleplay scenarios</h2>
-    <p class="lede">Eight standard settings, five written in Gen-Z register. Each opens with
-      its own first line and three suggested replies.</p>
-  </div>
-
-  <div class="grid grid--4">
-    <article class="glass card reveal" data-tilt><span class="card__n">01</span><h3>Free Conversation</h3><p>Talk about anything on your mind</p></article>
-    <article class="glass card reveal" data-tilt><span class="card__n">02</span><h3>Ordering Food at a Restaurant</h3><p>Order, ask questions, handle the bill</p></article>
-    <article class="glass card reveal" data-tilt><span class="card__n">03</span><h3>Job Interview Practice</h3><p>Answer common interview questions</p></article>
-    <article class="glass card reveal" data-tilt><span class="card__n">04</span><h3>Talking About My Weekend</h3><p>Practise past tense naturally</p></article>
-    <article class="glass card reveal" data-tilt><span class="card__n">05</span><h3>Shopping for Clothes</h3><p>Sizes, prices, asking for help</p></article>
-    <article class="glass card reveal" data-tilt><span class="card__n">06</span><h3>At the Doctor</h3><p>Describe symptoms clearly</p></article>
-    <article class="glass card reveal" data-tilt><span class="card__n">07</span><h3>At the Airport</h3><p>Check-in, security, directions</p></article>
-    <article class="glass card reveal" data-tilt><span class="card__n">08</span><h3>Giving a Presentation</h3><p>Open, explain, handle questions</p></article>
-    <article class="glass card reveal" data-tilt><span class="tag">Gen-Z</span><h3>Group Chat Energy</h3><p>Keep up with fast, casual texting talk</p></article>
-    <article class="glass card reveal" data-tilt><span class="tag">Gen-Z</span><h3>Hyping Up a Friend</h3><p>Compliments that sound natural, not cringe</p></article>
-    <article class="glass card reveal" data-tilt><span class="tag">Gen-Z</span><h3>Gaming Voice Chat</h3><p>Callouts, banter, gaming vocabulary</p></article>
-    <article class="glass card reveal" data-tilt><span class="tag">Gen-Z</span><h3>Reacting to Posts</h3><p>Comment like a native, not a bot</p></article>
-    <article class="glass card reveal" data-tilt><span class="tag">Gen-Z</span><h3>Casual to Formal Switch</h3><p>Know when to drop the slang</p></article>
-  </div>
-</section>
-
-<!-- ══ LESSONS ════════════════════════════════════════════════ -->
-<section>
-  <div class="section-head reveal">
-    <p class="eyebrow">Curriculum</p>
-    <h2>Fourteen lessons, six exercise types</h2>
-    <p class="lede">Typed Dart in <span class="mono">lib/data/content/</span>, not JSON — the
-      catalogue is checked by the compiler.</p>
-  </div>
-
-  <ol class="lessons reveal">
-    <li><span class="n">01</span><span class="t">Present Simple Basics</span><span class="s">He goes, she does, it works</span></li>
-    <li><span class="n">02</span><span class="t">Talking About Yesterday</span><span class="s">Regular and irregular past verbs</span></li>
-    <li><span class="n">03</span><span class="t">A, An &amp; The</span><span class="s">The small words that trip everyone up</span></li>
-    <li><span class="n">04</span><span class="t">Say It Stronger</span><span class="s">Upgrade good, big and happy</span></li>
-    <li><span class="n">05</span><span class="t">Around the House</span><span class="s">Everyday objects you will actually use</span></li>
-    <li><span class="n">06</span><span class="t">When You Do Not Understand</span><span class="s">Phrases that keep a conversation alive</span></li>
-    <li><span class="n">07</span><span class="t">Small Talk Starters</span><span class="s">Break the ice with anyone</span></li>
-    <li><span class="n">08</span><span class="t">Catching Numbers &amp; Times</span><span class="s">Hear the difference between 15 and 50</span></li>
-    <li><span class="n">09</span><span class="t">Mastering the TH Sound</span><span class="s">Think, this, three, that</span></li>
-    <li><span class="n">10</span><span class="t">Reading a Short Message</span><span class="s">Understand tone, not just words</span></li>
-    <li><span class="n">11</span><span class="t">Writing a Polite Request</span><span class="s">Get a yes without sounding demanding</span></li>
-    <li><span class="n">12</span><span class="t">Gen-Z Starter Pack</span><span class="s">No cap, this one slaps</span></li>
-    <li><span class="n">13</span><span class="t">Texting &amp; Shortforms</span><span class="s">IYKYK, TBH, NGL</span></li>
-    <li><span class="n">14</span><span class="t">Interview Answers That Land</span><span class="s">Tell me about yourself</span></li>
-  </ol>
-</section>
-
-<!-- ══ STACK ══════════════════════════════════════════════════ -->
-<section id="stack">
-  <div class="section-head reveal">
-    <p class="eyebrow">Stack</p>
-    <h2>Built with</h2>
-    <p class="lede">Nothing points back up the dependency chain. Every screen reads state
-      through Riverpod; no screen constructs a repository directly.</p>
-  </div>
-
-  <div class="reveal">
-    <div class="flow">
-      <b>features</b><i>→</i><b>providers</b><i>→</i><b>data</b><i>→</i><b>core</b>
+  <div class="cols reveal">
+    <div>
+      <h3>Roleplay conversations</h3>
+      <ul class="list">
+        <li><div><b>Free Conversation</b><small>Talk about anything on your mind</small></div><span class="free">Free</span></li>
+        <li><div><b>Ordering Food at a Restaurant</b><small>Order, ask questions, handle the bill</small></div><span class="free">Free</span></li>
+        <li><div><b>Job Interview Practice</b><small>Answer common interview questions</small></div><span class="free">Free</span></li>
+        <li><div><b>Talking About My Weekend</b><small>Practise past tense naturally</small></div><span class="free">Free</span></li>
+        <li><div><b>Shopping for Clothes</b><small>Sizes, prices, asking for help</small></div><span class="free">Free</span></li>
+        <li><div><b>At the Doctor</b><small>Describe symptoms clearly</small></div><span class="free">Free</span></li>
+        <li><div><b>At the Airport</b><small>Check-in, security, directions</small></div><span class="pro">Pro</span></li>
+        <li><div><b>Giving a Presentation</b><small>Open, explain, handle questions</small></div><span class="pro">Pro</span></li>
+        <li><div><b>Group Chat Energy</b><small>Keep up with fast, casual texting talk</small></div><span class="free">Free</span></li>
+        <li><div><b>Hyping Up a Friend</b><small>Compliments that sound natural, not cringe</small></div><span class="free">Free</span></li>
+        <li><div><b>Gaming Voice Chat</b><small>Callouts, banter, gaming vocabulary</small></div><span class="free">Free</span></li>
+        <li><div><b>Reacting to Posts</b><small>Comment like a native, not a bot</small></div><span class="free">Free</span></li>
+        <li><div><b>Casual to Formal Switch</b><small>Know when to drop the slang</small></div><span class="pro">Pro</span></li>
+      </ul>
+      <p class="count">Five of these are written in Gen-Z register.</p>
     </div>
-    <div class="stack">
-      <span>Flutter 3.35</span><span>Dart 3.5</span><span>flutter_riverpod</span>
-      <span>shared_preferences</span><span>speech_to_text</span><span>flutter_tts</span>
-      <span>firebase_auth</span><span>cloud_firestore</span><span>google_sign_in</span>
-      <span>flutter_local_notifications</span><span>web_socket_channel</span><span>record</span>
+
+    <div>
+      <h3>Lessons</h3>
+      <ul class="list">
+        <li><div><b>Present Simple Basics</b><small>He goes, she does, it works</small></div><span class="free">Free</span></li>
+        <li><div><b>Talking About Yesterday</b><small>Regular and irregular past verbs</small></div><span class="free">Free</span></li>
+        <li><div><b>A, An &amp; The</b><small>The small words that trip everyone up</small></div><span class="free">Free</span></li>
+        <li><div><b>Say It Stronger</b><small>Upgrade good, big and happy</small></div><span class="free">Free</span></li>
+        <li><div><b>Around the House</b><small>Everyday objects you will actually use</small></div><span class="free">Free</span></li>
+        <li><div><b>When You Do Not Understand</b><small>Phrases that keep a conversation alive</small></div><span class="free">Free</span></li>
+        <li><div><b>Small Talk Starters</b><small>Break the ice with anyone</small></div><span class="free">Free</span></li>
+        <li><div><b>Catching Numbers &amp; Times</b><small>Hear the difference between 15 and 50</small></div><span class="free">Free</span></li>
+        <li><div><b>Mastering the TH Sound</b><small>Think, this, three, that</small></div><span class="free">Free</span></li>
+        <li><div><b>Reading a Short Message</b><small>Understand tone, not just words</small></div><span class="free">Free</span></li>
+        <li><div><b>Writing a Polite Request</b><small>Get a yes without sounding demanding</small></div><span class="free">Free</span></li>
+        <li><div><b>Gen-Z Starter Pack</b><small>No cap, this one slaps</small></div><span class="free">Free</span></li>
+        <li><div><b>Texting &amp; Shortforms</b><small>IYKYK, TBH, NGL</small></div><span class="free">Free</span></li>
+        <li><div><b>Interview Answers That Land</b><small>Tell me about yourself</small></div><span class="pro">Pro</span></li>
+      </ul>
+      <p class="count">Six exercise types across the fourteen.</p>
     </div>
   </div>
-
-  <div class="grid grid--3 reveal" style="margin-top:2.6rem">
-    <article class="glass card" data-tilt>
-      <h3>Swappable seams</h3>
-      <p><span class="mono">AuthRepository</span> and <span class="mono">AiTutorService</span>
-        are interfaces with a single wiring point each in
-        <span class="mono">lib/providers/app_providers.dart</span>. Replacing the local
-        implementation with Firebase or a hosted LLM is a one-line override — no UI change.</p>
-    </article>
-    <article class="glass card" data-tilt>
-      <h3>Design tokens</h3>
-      <p>Colours are a <span class="mono">ThemeExtension</span>, so widgets read
-        <span class="mono">context.colors.textSecondary</span> and get the right value for the
-        active brightness without branching. Brand ramp #22D8F0 → #3B7BFF → #8B5CF6. Motion
-        160 / 260 / 420 ms.</p>
-    </article>
-    <article class="glass card" data-tilt>
-      <h3>Accessibility</h3>
-      <p>OS text scaling honoured up to 1.3×, clamped so fixed-height chrome survives.
-        Semantic labels on icon buttons, charts, achievements and score rings. Cards size to a
-        <em>minimum</em> height, so larger text grows the layout instead of clipping it.</p>
-    </article>
-  </div>
 </section>
+
+<div class="divider"><hr></div>
 
 <!-- ══ PRICING ════════════════════════════════════════════════ -->
 <section id="pricing">
-  <div class="section-head reveal">
-    <p class="eyebrow" style="color:var(--gold);text-shadow:0 0 20px rgba(255,197,61,.5)">Voix Pro</p>
+  <div class="head reveal">
+    <p class="eyebrow eyebrow--gold">Voix Pro</p>
     <h2>Everything you need to reach fluency faster</h2>
-    <p class="lede">Enter the email you sign in with, pick a plan, and tap buy. It opens
-      WhatsApp with your order already written out. Pay there, and Pro is switched on for
-      that account.</p>
+    <p class="lede">Enter the email you sign in with, pick a plan, and pay on WhatsApp.
+      Pro is switched on for that account.</p>
   </div>
 
-  <div class="glass gate reveal" id="gate">
+  <div class="frost gate reveal" id="gate">
     <label class="gate__label" for="email">Your Voix sign-in email</label>
     <input id="email" type="email" inputmode="email" autocomplete="email"
-           spellcheck="false" placeholder="you@example.com"
-           aria-describedby="gate-help">
-    <p class="gate__help" id="gate-help">Pro is activated on this account only, so use the
-      same email you sign in to the app with. If you have not signed up yet, create your
-      account in the app first — Pro cannot be attached to an email that does not exist.</p>
+           spellcheck="false" placeholder="you@example.com" aria-describedby="gate-help">
+    <p class="gate__help" id="gate-help">Pro is activated on this account only. Use the same
+      email you sign in to the app with — if you have not signed up yet, create your account
+      in the app first.</p>
     <p class="gate__err" id="gate-err">Enter the email address you sign in with.</p>
   </div>
 
   <div class="plans">
-
-    <article class="glass plan plan--gold reveal">
-      <span class="plan__ribbon">Special offer</span>
+    <article class="frost plan plan--gold reveal">
+      <span class="plan__tag">Special offer</span>
       <h3 class="plan__name">Weekly</h3>
       <p class="plan__for">Try Pro for a week before committing.</p>
       <p class="plan__price"><b>₹9</b><span>/ week</span></p>
-      <p class="plan__equiv">Billed once. Renew whenever you like.</p>
-
+      <p class="plan__sub">Billed once. Renew whenever you like.</p>
       <ul class="perks">
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="#FFC53D" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-          <div><b>Unlimited conversations</b><span>No daily practice limit, ever</span></div>
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="#FFC53D" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-          <div><b>All roleplay scenarios</b><span>Airport, presentations, interviews and more</span></div>
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="#FFC53D" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-          <div><b>Pro lessons</b><span>Advanced grammar and interview coaching</span></div>
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="#FFC53D" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-          <div><b>Deep progress insights</b><span>Track pronunciation trends over time</span></div>
-        </li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="#FFC53D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><div><b>Unlimited conversations</b><span>No daily practice limit, ever</span></div></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="#FFC53D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><div><b>All roleplay scenarios</b><span>Airport, presentations, interviews and more</span></div></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="#FFC53D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><div><b>Pro lessons</b><span>Advanced grammar and interview coaching</span></div></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="#FFC53D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><div><b>Deep progress insights</b><span>Track pronunciation trends over time</span></div></li>
       </ul>
-
       <a class="btn btn--gold" href="#" data-buy="Weekly" data-price="₹9">
         <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm0 18.15h-.01a8.23 8.23 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.19 8.19 0 0 1-1.26-4.38c0-4.54 3.7-8.23 8.25-8.23 2.2 0 4.27.86 5.83 2.42a8.18 8.18 0 0 1 2.41 5.82c0 4.54-3.7 8.23-8.24 8.23Zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.24-.64.8-.78.97-.15.16-.29.18-.53.06-.25-.13-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.01-.38.11-.5.11-.11.25-.29.37-.44.13-.15.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.4-.42-.56-.43h-.47c-.17 0-.43.06-.66.31-.22.25-.86.85-.86 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.47-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.14-1.18-.06-.1-.22-.16-.47-.28Z"/></svg>
         Buy weekly — ₹9
@@ -810,113 +529,108 @@ footer a:hover{color:var(--cyan)}
       <p class="plan__note">Opens WhatsApp with your order</p>
     </article>
 
-    <article class="glass plan reveal">
-      <span class="plan__ribbon plan__ribbon--plain">Standard</span>
+    <article class="frost plan reveal">
+      <span class="plan__tag plan__tag--plain">Standard</span>
       <h3 class="plan__name">Monthly</h3>
       <p class="plan__for">The full month, one payment.</p>
       <p class="plan__price"><b>₹299</b><span>/ month</span></p>
-      <p class="plan__equiv">Billed once. Renew whenever you like.</p>
-
+      <p class="plan__sub">Billed once. Renew whenever you like.</p>
       <ul class="perks">
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="#9AA6C7" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-          <div><b>Unlimited conversations</b><span>No daily practice limit, ever</span></div>
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="#9AA6C7" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-          <div><b>All roleplay scenarios</b><span>Airport, presentations, interviews and more</span></div>
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="#9AA6C7" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-          <div><b>Pro lessons</b><span>Advanced grammar and interview coaching</span></div>
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="#9AA6C7" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-          <div><b>Deep progress insights</b><span>Track pronunciation trends over time</span></div>
-        </li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="#9AA6C7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><div><b>Unlimited conversations</b><span>No daily practice limit, ever</span></div></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="#9AA6C7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><div><b>All roleplay scenarios</b><span>Airport, presentations, interviews and more</span></div></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="#9AA6C7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><div><b>Pro lessons</b><span>Advanced grammar and interview coaching</span></div></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="#9AA6C7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><div><b>Deep progress insights</b><span>Track pronunciation trends over time</span></div></li>
       </ul>
-
       <a class="btn btn--ghost" href="#" data-buy="Monthly" data-price="₹299">
         <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm0 18.15h-.01a8.23 8.23 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.19 8.19 0 0 1-1.26-4.38c0-4.54 3.7-8.23 8.25-8.23 2.2 0 4.27.86 5.83 2.42a8.18 8.18 0 0 1 2.41 5.82c0 4.54-3.7 8.23-8.24 8.23Zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.24-.64.8-.78.97-.15.16-.29.18-.53.06-.25-.13-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.01-.38.11-.5.11-.11.25-.29.37-.44.13-.15.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.4-.42-.56-.43h-.47c-.17 0-.43.06-.66.31-.22.25-.86.85-.86 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.47-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.14-1.18-.06-.1-.22-.16-.47-.28Z"/></svg>
         Buy monthly — ₹299
       </a>
       <p class="plan__note">Opens WhatsApp with your order</p>
     </article>
-
-  </div>
-
-  <div class="glass locked reveal">
-    <h3>What Pro unlocks in the app right now</h3>
-    <p class="muted" style="font-size:.9rem;margin:0 0 .9rem">
-      These are the lessons and scenarios currently marked
-      <span class="mono">proOnly</span> in the catalogue. Everything else is free.
-    </p>
-    <ul>
-      <li>Interview Answers That Land</li>
-      <li>At the Airport</li>
-      <li>Giving a Presentation</li>
-      <li>Casual to Formal Switch</li>
-    </ul>
   </div>
 </section>
 
-<!-- ══ STATE ══════════════════════════════════════════════════ -->
-<section>
-  <div class="section-head reveal">
-    <p class="eyebrow">Status</p>
-    <h2>What is built, and what is not</h2>
-    <p class="lede">The app runs end to end on a fresh clone. Three things still need wiring,
-      and this is the list.</p>
-  </div>
+<div class="divider"><hr></div>
 
-  <div class="state-wrap reveal">
-    <table class="state">
-      <thead><tr><th scope="col">Area</th><th scope="col">State</th></tr></thead>
-      <tbody>
-        <tr><td>Splash, onboarding (11 steps), auth</td><td class="ok">Complete</td></tr>
-        <tr><td>Home, Learn, Practice, Progress, Profile</td><td class="ok">Complete</td></tr>
-        <tr><td>AI conversation and coaching report</td><td class="ok">Complete, on-device</td></tr>
-        <tr><td>14 lessons / 6 exercise types</td><td class="ok">Complete</td></tr>
-        <tr><td>13 roleplay scenarios (Standard + Gen-Z)</td><td class="ok">Complete</td></tr>
-        <tr><td>XP, levels, streaks, 12 achievements</td><td class="ok">Complete</td></tr>
-        <tr><td>Settings, notifications, privacy, help</td><td class="ok">Complete</td></tr>
-        <tr><td>Speech-to-text / text-to-speech</td><td class="ok">Complete (device engines)</td></tr>
-        <tr><td>Google / Apple sign-in</td><td class="wip">Needs Firebase — docs/FIREBASE_SETUP.md</td></tr>
-        <tr><td>Push notification delivery</td><td class="wip">Needs a plugin — docs/BACKEND.md</td></tr>
-        <tr><td>Play Billing for Pro</td><td class="wip">Not wired — docs/BACKEND.md</td></tr>
-      </tbody>
-    </table>
+<!-- ══ HOW ════════════════════════════════════════════════════ -->
+<section id="how">
+  <div class="head reveal">
+    <p class="eyebrow eyebrow--gold">How it works</p>
+    <h2>Three steps, about two minutes</h2>
   </div>
+  <ol class="steps reveal">
+    <li class="panel">
+      <h3>Pick a plan</h3>
+      <p>Enter your sign-in email and tap buy. WhatsApp opens with your order already
+        written out — plan, price and email.</p>
+    </li>
+    <li class="panel">
+      <h3>Pay on WhatsApp</h3>
+      <p>You get the payment details in the chat. Pay however suits you, and send the
+        confirmation back in the same conversation.</p>
+    </li>
+    <li class="panel">
+      <h3>Open the app</h3>
+      <p>Pro is switched on for your account. Sign in with the same email and the locked
+        lessons and scenarios are there.</p>
+    </li>
+  </ol>
 </section>
 
-<!-- ══ CONTACT ════════════════════════════════════════════════ -->
-<section id="contact">
-  <div class="glass contact reveal">
-    <p class="eyebrow">Get started</p>
-    <h2>No backend, no API keys, no config files</h2>
-    <p class="lede" style="margin:1rem auto 0">The app runs end to end on a fresh clone.
-      Requires Flutter 3.35+ (Dart 3.5+).</p>
-    <pre class="code" style="text-align:left;max-width:36rem;margin:2rem auto 0"><b>$</b> git clone https://github.com/nagachaitanyanagachaitanya695-dot/voix
-<b>$</b> cd voix
-<b>$</b> flutter pub get
-<b>$</b> flutter run
+<div class="divider"><hr></div>
 
-<b>$</b> flutter analyze   <i># 0 issues</i>
-<b>$</b> flutter test      <i># 52 tests</i></pre>
-    <div class="hero__cta">
-      <a class="btn" href="https://github.com/nagachaitanyanagachaitanya695-dot/voix">Open on GitHub</a>
-      <a class="btn btn--ghost" href="#try">Try the corrector</a>
-    </div>
+<!-- ══ FAQ ════════════════════════════════════════════════════ -->
+<section id="faq">
+  <div class="head reveal">
+    <p class="eyebrow">Questions</p>
+    <h2>Before you pay</h2>
+  </div>
+
+  <div class="faq reveal">
+    <details class="panel">
+      <summary>Which email should I use?</summary>
+      <p>The one you sign in to the Voix app with. Pro is attached to that account, so an
+        email that has never been used to sign up cannot be upgraded. If you have not made an
+        account yet, open the app and sign up first — it takes a moment and it is free.</p>
+    </details>
+    <details class="panel">
+      <summary>How long until Pro is active?</summary>
+      <p>It is switched on by hand after your payment is confirmed, so it is not instant. If
+        Pro has not appeared, reply in the same WhatsApp chat and it will be sorted there.</p>
+    </details>
+    <details class="panel">
+      <summary>Does it renew automatically?</summary>
+      <p>No. There is no subscription and nothing is stored to charge you again — each
+        payment is one-off. When the week or month is up, buy again if you want to continue.</p>
+    </details>
+    <details class="panel">
+      <summary>Why is the weekly plan so much cheaper?</summary>
+      <p>₹9 is an introductory price meant for trying Pro, not a permanent rate. It may
+        change. The ₹299 monthly plan is the standard price.</p>
+    </details>
+    <details class="panel">
+      <summary>What do I lose if I do not pay?</summary>
+      <p>Very little. Ten of the thirteen conversations and thirteen of the fourteen lessons
+        are free forever, along with grammar correction, speaking practice, streaks and
+        progress. Pro removes the daily practice limit and unlocks the four items marked
+        above.</p>
+    </details>
+    <details class="panel">
+      <summary>Does it work without internet?</summary>
+      <p>Yes. Corrections run on your phone rather than on a server, which is what makes them
+        appear the moment you finish a sentence. You can practise on a plane.</p>
+    </details>
   </div>
 </section>
 
 <footer>
   <span>Voix — your personal AI language tutor</span>
-  <span>Fonts in-app: Plus Jakarta Sans &amp; Manrope, SIL OFL 1.1 · 3D by <a href="vendor/THREE-LICENSE.txt">three.js</a>, MIT</span>
-  <a href="https://github.com/nagachaitanyanagachaitanya695-dot/voix">github.com/nagachaitanyanagachaitanya695-dot/voix</a>
+  <span>Questions? Message us on WhatsApp.</span>
+  <a href="https://github.com/nagachaitanyanagachaitanya695-dot/voix">Built with Flutter · source on GitHub</a>
 </footer>
 
 </div>
+
 
 <script src="vendor/three.min.js"></script>
 <script>
@@ -1214,7 +928,7 @@ footer a:hover{color:var(--cyan)}
     return;   // No WebGL: the page keeps its gradients and reads fine.
   }
 
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
   renderer.setSize(window.innerWidth, window.innerHeight);
 
   var scene = new THREE.Scene();
@@ -1353,7 +1067,7 @@ footer a:hover{color:var(--cyan)}
   group.add(shell);
 
   // Particle field: a shell plus a flat ring, so it reads as orbit not fog.
-  var COUNT = 1400;
+  var COUNT = 900;
   var pos = new Float32Array(COUNT * 3);
   var seed = new Float32Array(COUNT);
   for (var p = 0; p < COUNT; p++) {
@@ -1411,6 +1125,19 @@ footer a:hover{color:var(--cyan)}
 
   /* ── Drive it ───────────────────────────────────────────────── */
 
+  // Rendering a full-screen scene behind content nobody can see it through is
+  // the main reason scrolling stuttered. Below the hero, the loop idles.
+  var heroVisible = true, hidden = false, lastOpacity = -1;
+  var heroEl = document.getElementById('top');
+  if ('IntersectionObserver' in window && heroEl) {
+    new IntersectionObserver(function (es) {
+      heroVisible = es[0].isIntersecting;
+      document.body.classList.toggle('past-hero', !heroVisible);
+      if (!heroVisible && lastOpacity !== 0) { canvas.style.opacity = '0'; lastOpacity = 0; }
+    }, { threshold: 0 }).observe(heroEl);
+  }
+  document.addEventListener('visibilitychange', function () { hidden = document.hidden; });
+
   var pointer = { x: 0, y: 0 };
   var smooth  = { x: 0, y: 0 };
   var scrollY = 0, scrollSmooth = 0;
@@ -1445,6 +1172,7 @@ footer a:hover{color:var(--cyan)}
 
   function tick() {
     requestAnimationFrame(tick);
+    if (hidden || !heroVisible) return;
 
     var t = clock.getElapsedTime();
     uniforms.uTime.value = t;
@@ -1473,7 +1201,8 @@ footer a:hover{color:var(--cyan)}
     var vh = window.innerHeight;
     var away = Math.min(scrollSmooth / vh, 1);
     group.scale.setScalar((window.innerWidth / window.innerHeight < 0.95 ? 0.72 : 1) * (1 - away * 0.35));
-    canvas.style.opacity = String(Math.max(0, 1 - away * 1.15));
+    var op = Math.max(0, 1 - away * 1.15);
+    if (Math.abs(op - lastOpacity) > 0.01) { canvas.style.opacity = String(op); lastOpacity = op; }
 
     // The CSS blooms drift at their own depths.
     for (var i = 0; i < blooms.length; i++) {
