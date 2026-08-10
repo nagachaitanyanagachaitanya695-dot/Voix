@@ -461,6 +461,37 @@ section{
   color:var(--gold);
 }
 
+/* ── Account gate ───────────────────────────────────────────── */
+.gate{padding:1.5rem 1.6rem; margin-top:2.2rem; display:grid; gap:.75rem}
+.gate__label{
+  font-family:var(--mono); font-size:.7rem; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--gold);
+}
+.gate input{
+  width:100%;
+  background:rgba(4,6,15,.55);
+  border:1px solid var(--glass-line);
+  border-radius:12px;
+  color:var(--text);
+  font-family:var(--ui); font-size:1.02rem;
+  padding:.85rem 1rem;
+  outline:none;
+  transition:border-color 240ms var(--ease), box-shadow 240ms var(--ease);
+}
+.gate input::placeholder{color:var(--text-3)}
+.gate input:focus{border-color:rgba(255,197,61,.65); box-shadow:0 0 0 4px rgba(255,197,61,.12)}
+.gate input:focus-visible{outline:2px solid var(--gold); outline-offset:2px}
+.gate__help{font-size:.85rem; color:var(--text-2); margin:0}
+.gate__err{
+  font-size:.85rem; color:#FF7A93; margin:0; display:none;
+}
+.gate.is-bad input{border-color:rgba(255,122,147,.7)}
+.gate.is-bad .gate__err{display:block}
+.gate.is-ok input{border-color:rgba(74,222,128,.5)}
+
+.btn.is-locked{opacity:.45; filter:saturate(.35); cursor:not-allowed}
+.btn.is-locked:hover{transform:none; box-shadow:0 8px 30px var(--glow)}
+
 /* ── State table ────────────────────────────────────────────── */
 .state{width:100%; border-collapse:collapse; margin-top:2.2rem; font-size:.94rem}
 .state th{
@@ -728,8 +759,20 @@ footer a:hover{color:var(--cyan)}
   <div class="section-head reveal">
     <p class="eyebrow" style="color:var(--gold);text-shadow:0 0 20px rgba(255,197,61,.5)">Voix Pro</p>
     <h2>Everything you need to reach fluency faster</h2>
-    <p class="lede">Pick a plan and tap buy — it opens WhatsApp with your order already
-      written out. Pay there, and your account is switched to Pro.</p>
+    <p class="lede">Enter the email you sign in with, pick a plan, and tap buy. It opens
+      WhatsApp with your order already written out. Pay there, and Pro is switched on for
+      that account.</p>
+  </div>
+
+  <div class="glass gate reveal" id="gate">
+    <label class="gate__label" for="email">Your Voix sign-in email</label>
+    <input id="email" type="email" inputmode="email" autocomplete="email"
+           spellcheck="false" placeholder="you@example.com"
+           aria-describedby="gate-help">
+    <p class="gate__help" id="gate-help">Pro is activated on this account only, so use the
+      same email you sign in to the app with. If you have not signed up yet, create your
+      account in the app first — Pro cannot be attached to an email that does not exist.</p>
+    <p class="gate__err" id="gate-err">Enter the email address you sign in with.</p>
   </div>
 
   <div class="plans">
@@ -1459,10 +1502,52 @@ footer a:hover{color:var(--cyan)}
      ───────────────────────────────────────────────────────────── */
   var WHATSAPP_NUMBER = '917032127145';
 
+  var gate     = document.getElementById('gate');
+  var emailEl  = document.getElementById('email');
+  var buyBtns  = Array.prototype.slice.call(document.querySelectorAll('[data-buy]'));
+
+  // Deliberately permissive: something@something.tld with no spaces. The real
+  // check is that the address matches an account, and only the app can do that.
+  function validEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()); }
+
+  function currentEmail() { return emailEl ? emailEl.value.trim() : ''; }
+
+  function syncGate() {
+    var ok = validEmail(currentEmail());
+    var touched = currentEmail().length > 0;
+    gate.classList.toggle('is-ok', ok);
+    gate.classList.toggle('is-bad', touched && !ok);
+    buyBtns.forEach(function (b) {
+      b.classList.toggle('is-locked', !ok);
+      b.setAttribute('aria-disabled', ok ? 'false' : 'true');
+    });
+    if (ok) { try { localStorage.setItem('voix.email', currentEmail()); } catch (e) {} }
+    return ok;
+  }
+
+  if (emailEl) {
+    try {
+      var saved = localStorage.getItem('voix.email');
+      if (saved) emailEl.value = saved;
+    } catch (e) {}
+    emailEl.addEventListener('input', syncGate);
+    emailEl.addEventListener('blur', syncGate);
+    syncGate();
+  }
+
   function buy(plan, price) {
+    // No email, no order — otherwise there is no way to know which account to upgrade.
+    if (!syncGate()) {
+      gate.classList.add('is-bad');
+      emailEl.focus();
+      gate.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      return;
+    }
+
     var msg = 'Hi! I would like to buy Voix Pro.\n\n' +
               'Plan: ' + plan + '\n' +
-              'Price: ' + price + '\n\n' +
+              'Price: ' + price + '\n' +
+              'Account email: ' + currentEmail() + '\n\n' +
               'Please send me the payment details.';
 
     if (!WHATSAPP_NUMBER) {
@@ -1480,7 +1565,7 @@ footer a:hover{color:var(--cyan)}
     );
   }
 
-  Array.prototype.forEach.call(document.querySelectorAll('[data-buy]'), function (el) {
+  buyBtns.forEach(function (el) {
     el.addEventListener('click', function (e) {
       e.preventDefault();
       buy(el.dataset.buy, el.dataset.price);
