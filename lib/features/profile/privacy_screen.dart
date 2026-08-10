@@ -6,6 +6,7 @@ import '../../core/theme/app_dimens.dart';
 import '../../core/utils/context_ext.dart';
 import '../../core/widgets/staggered.dart';
 import '../../data/repositories/auth_repository.dart';
+import '../../providers/app_providers.dart';
 import '../../providers/session_controller.dart';
 import '../../providers/user_controller.dart';
 import '../onboarding/onboarding_flow.dart';
@@ -47,7 +48,7 @@ class PrivacyScreen extends ConsumerWidget {
                 icon: Icons.lock_outline_rounded,
                 title: 'Data Usage',
                 subtitle: 'Manage how we use your data',
-                onTap: () => _showDataSheet(context),
+                onTap: () => _showDataSheet(context, ref),
               ),
               SettingsTile(
                 icon: Icons.history_rounded,
@@ -79,11 +80,21 @@ class PrivacyScreen extends ConsumerWidget {
     );
   }
 
-  void _showDataSheet(BuildContext context) {
+  void _showDataSheet(BuildContext context, WidgetRef ref) {
+    // What is true here depends on whether the build has a backend: with
+    // Firebase off, progress genuinely never leaves the phone. Saying so
+    // unconditionally would become a false privacy claim the moment an account
+    // is configured, which is the one kind of copy that must never go stale.
+    final syncing = ref.read(firebaseReadyProvider);
+
     showModalBottomSheet<void>(
       context: context,
+      // A modal sheet is capped at a fraction of the screen height, and this
+      // one is dense text that grows further at large accessibility text
+      // scales. Scrollable so it can never clip a privacy disclosure.
+      isScrollControlled: true,
       builder: (_) => SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.xs, Gap.lg, Gap.xl),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -91,23 +102,39 @@ class PrivacyScreen extends ConsumerWidget {
             children: [
               Text('Data Usage', style: context.text.headlineSmall),
               Gap.h16,
-              for (final item in const [
+              for (final item in [
                 (
                   Icons.mic_rounded,
                   'Voice',
-                  'Audio is transcribed by your device\'s speech recogniser '
-                      'and is not stored by Voix.',
+                  'Voix never records or stores audio. Your speech is passed '
+                      'to your phone\'s own recogniser to be turned into text '
+                      '— on most Android phones that is Google\'s, which may '
+                      'send the audio to Google to transcribe. You can type '
+                      'to the tutor instead.',
                 ),
                 (
                   Icons.forum_rounded,
                   'Conversations',
-                  'Transcripts and feedback reports are saved locally so you '
-                      'can review them later.',
+                  syncing
+                      ? 'Transcripts and feedback reports are saved on this '
+                          'device and backed up to your account.'
+                      : 'Transcripts and feedback reports are saved on this '
+                          'device only.',
                 ),
                 (
                   Icons.insights_rounded,
                   'Progress',
-                  'XP, streaks and activity history stay on this device.',
+                  syncing
+                      ? 'XP, streaks and activity history are backed up to '
+                          'your account so a new phone restores them.'
+                      : 'XP, streaks and activity history stay on this device. '
+                          'Uninstalling the app erases them.',
+                ),
+                (
+                  Icons.block_rounded,
+                  'No tracking',
+                  'No advertising, no analytics, and nothing sold or shared '
+                      'with anyone.',
                 ),
               ])
                 Padding(

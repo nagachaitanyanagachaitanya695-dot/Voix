@@ -86,11 +86,13 @@ version: 1.0.0+1   # 1.0.0 is shown to users, 1 is the versionCode
 - [ ] **Test the microphone and the voice on a real phone.** They have never run
       on hardware. This is the app's core feature.
 - [ ] **Host a privacy policy and link it in the Play Console.** Mandatory,
-      because the app requests `RECORD_AUDIO`. Not written yet.
-- [ ] **Fill in the Data Safety form.** Declare: audio recording (processed
-      on-device by Android's speech recogniser, not uploaded by Voix), email
-      address and name (only if you enable Firebase auth), and app activity /
-      learning progress.
+      because the app requests `RECORD_AUDIO`. A drafted policy is in
+      `docs/PRIVACY_POLICY.md` — fill in the bracketed placeholders, host it
+      (GitHub Pages instructions are at the bottom of that file), and paste the
+      URL into Play Console → App content.
+- [ ] **Fill in the Data Safety form.** It has to match the privacy policy or
+      the submission is rejected. `docs/PRIVACY_POLICY.md` ends with a
+      question-by-question table for it.
 - [ ] **Configure Firebase**, or ship knowing that accounts are device-local and
       a reinstall wipes all progress. See `docs/FIREBASE_SETUP.md`.
 - [ ] Store listing assets: the 512×512 icon is generated at
