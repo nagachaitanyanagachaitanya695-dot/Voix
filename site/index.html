@@ -1,0 +1,1212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voix — your personal AI language tutor</title>
+<meta name="description" content="Voix teaches you to speak confidently by having real conversations with an AI tutor that corrects your grammar, upgrades your vocabulary, and explains why. Flutter, on-device, offline.">
+<style>
+/* ───────────────────────────────────────────────────────────────
+   Lo-Fi. Paper-yellow ground, three riso inks, system fonts only.
+   Nothing here loads from a network.
+   ─────────────────────────────────────────────────────────────── */
+:root{
+  --paper:#E8E0C0;
+  --paper-2:#EDE4CF;
+  --ink:#191713;
+  --pink:#FF006E;
+  --teal:#00A98F;
+  --teal-bright:#00FFCC;
+  --serif:"Times New Roman", Times, serif;
+  --sans:Helvetica, Arial, sans-serif;
+  --mono:"Courier New", Courier, monospace;
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  overflow-x:hidden;
+}
+
+/* Halftone dot tile, used as the page's base texture. */
+body::before{
+  content:"";
+  position:fixed; inset:0; z-index:0; pointer-events:none;
+  background-image:radial-gradient(var(--ink) 0.7px, transparent 0.8px);
+  background-size:4px 4px;
+  opacity:.11;
+}
+/* Photocopy fall-off in the corners. */
+body::after{
+  content:"";
+  position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:radial-gradient(130% 100% at 50% 40%, transparent 55%, rgba(25,23,19,.22) 100%);
+}
+main, header, footer{position:relative; z-index:1}
+
+a{color:var(--ink)}
+
+/* ── Typographic primitives ─────────────────────────────────── */
+.masthead{
+  font-family:var(--serif);
+  font-weight:700;
+  font-size:clamp(5.5rem, 21vw, 17rem);
+  line-height:.78;
+  letter-spacing:-.045em;
+  margin:0;
+  text-shadow:3px 0 var(--pink), -3px 0 var(--teal-bright);
+}
+h2{
+  font-family:var(--serif);
+  font-weight:700;
+  font-size:clamp(2.1rem, 5.6vw, 4.1rem);
+  line-height:.92;
+  letter-spacing:-.03em;
+  margin:0 0 .35em;
+  text-shadow:2px 0 var(--pink), -2px 0 var(--teal-bright);
+}
+h3{
+  font-family:var(--sans);
+  font-weight:700;
+  font-size:1.02rem;
+  line-height:1.25;
+  letter-spacing:-.01em;
+  margin:0 0 .3em;
+}
+p{line-height:1.55; margin:0 0 1em}
+.lede{
+  font-family:var(--serif);
+  font-size:clamp(1.15rem, 2.3vw, 1.6rem);
+  line-height:1.4;
+  max-width:34ch;
+}
+.note{
+  font-family:var(--mono);
+  font-size:.74rem;
+  line-height:1.5;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+.body{max-width:62ch; font-size:1rem}
+
+section{
+  padding:clamp(4rem, 9vw, 8.5rem) clamp(1.15rem, 5vw, 5rem);
+  max-width:1220px;
+  margin:0 auto;
+}
+.rule{
+  border:0;
+  border-top:2px solid var(--ink);
+  margin:0 clamp(1.15rem,5vw,5rem);
+  max-width:1220px;
+}
+
+/* ── Hero ───────────────────────────────────────────────────── */
+.hero{height:210vh; position:relative; padding:0; max-width:none}
+.hero-stage{
+  position:sticky; top:0;
+  height:100vh;
+  overflow:hidden;
+}
+#riso{
+  position:absolute; inset:0;
+  width:100%; height:100%;
+  display:block;
+}
+.hero-fallback{
+  position:absolute; inset:0;
+  display:none;
+  place-items:center;
+  font-family:var(--mono);
+  font-size:.8rem;
+  text-align:center;
+  padding:2rem;
+}
+.no-webgl #riso{display:none}
+.no-webgl .hero-fallback{display:grid}
+
+/* The masthead is pasted onto the press sheet, not floated over it —
+   a paper panel with a hard offset shadow, tipped off-grid. */
+.hero-type{
+  position:absolute;
+  left:clamp(1.15rem,4.5vw,4rem);
+  bottom:clamp(1.8rem,5vw,3.6rem);
+  width:min(560px, 88vw);
+  background:var(--paper-2);
+  border:3px solid var(--ink);
+  box-shadow:12px 12px 0 var(--ink);
+  padding:clamp(1.1rem,2.4vw,1.9rem) clamp(1.1rem,2.4vw,1.9rem) clamp(1.3rem,2.6vw,1.9rem);
+  transform:rotate(-2.2deg);
+  transform-origin:left bottom;
+}
+.hero-type::after{  /* torn top edge */
+  content:"";
+  position:absolute;
+  left:-3px; right:-3px; top:-12px;
+  height:12px;
+  background:
+    repeating-linear-gradient(-63deg, var(--paper-2) 0 7px, transparent 7px 14px);
+  border-top:3px solid var(--ink);
+}
+.masthead-wrap{transform:rotate(-1.2deg); transform-origin:left bottom}
+.masthead{font-size:clamp(4.2rem, 12vw, 9.5rem)}
+.hero-sub{
+  font-family:var(--serif);
+  font-size:clamp(.98rem,1.7vw,1.24rem);
+  line-height:1.34;
+  max-width:34ch;
+  margin:1.1rem 0 1.2rem;
+}
+.hero-kicker{
+  position:absolute;
+  top:clamp(1.4rem,4vw,2.6rem);
+  left:clamp(1.15rem,5vw,5rem);
+  font-family:var(--mono);
+  font-size:.72rem;
+  letter-spacing:.13em;
+  text-transform:uppercase;
+  transform:rotate(-2deg);
+}
+.hero-hint{
+  position:absolute;
+  right:clamp(1.15rem,5vw,5rem);
+  bottom:clamp(2.2rem,6vw,4rem);
+  font-family:var(--mono);
+  font-size:.72rem;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  text-align:right;
+  transform:rotate(2.5deg);
+  max-width:15ch;
+  line-height:1.5;
+}
+
+/* ── Buttons: native controls, hard offset shadow ───────────── */
+.actions{display:flex; flex-wrap:wrap; gap:.9rem; transform:rotate(-1deg)}
+.btn{
+  font-family:var(--sans);
+  font-weight:700;
+  font-size:.94rem;
+  padding:.78rem 1.35rem;
+  background:var(--ink);
+  color:var(--paper);
+  border:2px solid var(--ink);
+  text-decoration:none;
+  display:inline-block;
+  box-shadow:6px 6px 0 var(--pink);
+  transition:transform 90ms steps(2), box-shadow 90ms steps(2);
+}
+.btn:hover{transform:translate(3px,3px); box-shadow:3px 3px 0 var(--pink)}
+.btn--ghost{
+  background:transparent;
+  color:var(--ink);
+  box-shadow:6px 6px 0 var(--teal);
+}
+.btn--ghost:hover{box-shadow:3px 3px 0 var(--teal)}
+
+/* ── Two-column intro ───────────────────────────────────────── */
+.split{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:clamp(1.6rem,4vw,4rem);
+  align-items:start;
+}
+/* minmax(0,…) rather than 1fr: the clone URL in <pre> is unbreakable and
+   would otherwise widen the track instead of scrolling inside it. */
+@media (max-width:800px){ .split{grid-template-columns:minmax(0,1fr)} }
+
+/* ── Verdict list: what the engine must catch / must not touch ─ */
+.verdicts{list-style:none; padding:0; margin:0}
+.verdicts li{
+  border-top:2px solid var(--ink);
+  padding:.85rem 0 .95rem;
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  gap:.8rem;
+  align-items:baseline;
+}
+.verdicts li:last-child{border-bottom:2px solid var(--ink)}
+.mark{
+  font-family:var(--mono);
+  font-weight:700;
+  font-size:.7rem;
+  letter-spacing:.1em;
+  padding:.2rem .45rem;
+  border:2px solid var(--ink);
+  white-space:nowrap;
+}
+.mark--fix{background:var(--pink); color:var(--paper); border-color:var(--pink)}
+.mark--keep{background:var(--teal); color:var(--paper); border-color:var(--teal)}
+.sentence{font-family:var(--serif); font-size:1.16rem; line-height:1.3}
+.sentence del{text-decoration:line-through 2px var(--pink)}
+.sentence ins{text-decoration:none; font-family:var(--sans); font-weight:700}
+.why{
+  font-family:var(--mono);
+  font-size:.73rem;
+  line-height:1.55;
+  margin:.45rem 0 0;
+  max-width:52ch;
+}
+
+/* ── Card decks ─────────────────────────────────────────────── */
+.deck{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(230px, 1fr));
+  gap:clamp(1.1rem, 2.6vw, 2rem);
+  margin-top:2.6rem;
+}
+.card{
+  position:relative;
+  background:var(--paper-2);
+  border:2px solid var(--ink);
+  padding:1.35rem 1.15rem 1.2rem;
+  box-shadow:7px 7px 0 rgba(25,23,19,.85);
+  min-height:118px;
+}
+.card:nth-child(3n+1){transform:rotate(-2.2deg)}
+.card:nth-child(3n+2){transform:rotate(1.7deg)}
+.card:nth-child(3n+3){transform:rotate(-.9deg)}
+.card:nth-child(5n){box-shadow:7px 7px 0 var(--pink)}
+.card:nth-child(7n){box-shadow:7px 7px 0 var(--teal)}
+.card p{
+  font-family:var(--mono);
+  font-size:.75rem;
+  line-height:1.5;
+  margin:0;
+}
+.card .idx{
+  position:absolute;
+  top:.5rem; right:.6rem;
+  font-family:var(--mono);
+  font-size:.68rem;
+  font-weight:700;
+}
+/* Sticky-tape corner. */
+.card::before{
+  content:"";
+  position:absolute;
+  top:-11px; left:22px;
+  width:62px; height:21px;
+  background:rgba(0,169,143,.34);
+  border-left:1px solid rgba(25,23,19,.28);
+  border-right:1px solid rgba(25,23,19,.28);
+  transform:rotate(-6deg);
+}
+.card:nth-child(even)::before{
+  background:rgba(255,0,110,.26);
+  left:auto; right:20px;
+  transform:rotate(5deg);
+}
+
+.tag{
+  display:inline-block;
+  font-family:var(--mono);
+  font-size:.63rem;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  border:2px solid var(--ink);
+  padding:.12rem .4rem;
+  margin-bottom:.55rem;
+}
+.tag--genz{background:var(--pink); color:var(--paper); border-color:var(--pink)}
+
+/* ── Lesson index: a printed contents page ──────────────────── */
+.index{border-top:2px solid var(--ink)}
+.index li{
+  list-style:none;
+  border-bottom:1px solid rgba(25,23,19,.45);
+  padding:.72rem .2rem;
+  display:grid;
+  grid-template-columns:2.7rem minmax(0,1fr) minmax(0,1fr);
+  gap:.7rem;
+  align-items:baseline;
+}
+.index{padding:0; margin:2.4rem 0 0}
+.index .n{font-family:var(--mono); font-size:.78rem; font-weight:700}
+.index .t{font-family:var(--serif); font-size:1.14rem; line-height:1.2}
+.index .s{font-family:var(--sans); font-size:.82rem; line-height:1.3}
+@media (max-width:700px){
+  .index li{grid-template-columns:2.2rem minmax(0,1fr)}
+  .index .s{grid-column:2; font-size:.76rem}
+}
+
+/* ── State table ────────────────────────────────────────────── */
+.state{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:2.4rem;
+  font-family:var(--sans);
+  font-size:.92rem;
+}
+.state th, .state td{
+  border:2px solid var(--ink);
+  padding:.62rem .75rem;
+  text-align:left;
+  vertical-align:top;
+}
+.state th{
+  font-family:var(--mono);
+  font-size:.68rem;
+  letter-spacing:.11em;
+  text-transform:uppercase;
+  background:var(--ink);
+  color:var(--paper);
+}
+.state td:last-child{font-family:var(--mono); font-size:.76rem; white-space:normal}
+.state tr:nth-child(even) td{background:rgba(25,23,19,.055)}
+.done{color:var(--teal); font-weight:700}
+.todo{color:var(--pink); font-weight:700}
+.state-wrap{overflow-x:auto}
+
+/* ── Badges ─────────────────────────────────────────────────── */
+.badges{display:flex; flex-wrap:wrap; gap:.7rem; margin-top:2.4rem; padding:0; list-style:none}
+.badges li{
+  font-family:var(--mono);
+  font-size:.76rem;
+  border:2px solid var(--ink);
+  padding:.42rem .7rem;
+  background:var(--paper-2);
+}
+.badges li:nth-child(4n+1){transform:rotate(-2.4deg)}
+.badges li:nth-child(4n+2){transform:rotate(1.9deg)}
+.badges li:nth-child(4n+3){transform:rotate(-1.1deg)}
+.badges li:nth-child(4n){transform:rotate(3deg)}
+
+/* ── Figures / stats ────────────────────────────────────────── */
+.figures{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(140px,1fr));
+  gap:1px;
+  background:var(--ink);
+  border:2px solid var(--ink);
+  margin-top:2.6rem;
+}
+.figures div{background:var(--paper); padding:1.1rem .95rem}
+.figures b{
+  display:block;
+  font-family:var(--serif);
+  font-size:clamp(2rem,4.6vw,3.2rem);
+  line-height:.9;
+  font-weight:700;
+  letter-spacing:-.03em;
+}
+.figures span{
+  display:block;
+  font-family:var(--mono);
+  font-size:.68rem;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  margin-top:.5rem;
+  line-height:1.4;
+}
+
+/* ── Code / shell ───────────────────────────────────────────── */
+pre{
+  font-family:var(--mono);
+  font-size:.83rem;
+  line-height:1.7;
+  background:var(--ink);
+  color:var(--paper);
+  padding:1.1rem 1.2rem;
+  border:2px solid var(--ink);
+  box-shadow:7px 7px 0 var(--teal);
+  margin:1.6rem 0 0;
+  /* The clone URL is longer than the column; wrap it rather than clip it. */
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+}
+pre b{color:var(--teal-bright); font-weight:400}
+pre span{opacity:.55}
+code{font-family:var(--mono); font-size:.88em}
+
+/* ── Footer ─────────────────────────────────────────────────── */
+footer{
+  border-top:2px solid var(--ink);
+  padding:clamp(2.5rem,6vw,4.5rem) clamp(1.15rem,5vw,5rem) 3.5rem;
+  max-width:1220px;
+  margin:0 auto;
+}
+.footgrid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(210px,1fr));
+  gap:2rem;
+}
+footer p, footer li{font-family:var(--mono); font-size:.74rem; line-height:1.55}
+footer li{margin-bottom:.6rem}
+footer ul{list-style:none; padding:0; margin:0}
+footer h3{
+  font-family:var(--mono);
+  font-size:.68rem;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  border-bottom:2px solid var(--ink);
+  padding-bottom:.4rem;
+  margin-bottom:.7rem;
+}
+
+@media (prefers-reduced-motion: reduce){
+  .btn{transition:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ HERO ═══════════════════════════════════════════════════ -->
+<header class="hero">
+  <div class="hero-stage">
+    <canvas id="riso"></canvas>
+    <div class="hero-fallback">
+      <p class="note">This browser has no WebGL2 context, so the correction deck is not drawn. Everything below still reads.</p>
+    </div>
+
+    <p class="hero-kicker">Flutter&nbsp;·&nbsp;Riverpod&nbsp;·&nbsp;runs offline</p>
+    <p class="hero-hint">Drag to spin the deck</p>
+
+    <div class="hero-type">
+      <div class="masthead-wrap"><h1 class="masthead">VOIX</h1></div>
+      <p class="hero-sub">Your personal AI language tutor. It corrects your grammar, upgrades your vocabulary, and explains <em>why</em> — not just <em>what</em>.</p>
+      <div class="actions">
+        <a class="btn" href="https://github.com/nagachaitanyanagachaitanya695-dot/voix">View the source</a>
+        <a class="btn btn--ghost" href="#engine">How the correction works</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<hr class="rule">
+
+<!-- ══ ENGINE ═════════════════════════════════════════════════ -->
+<section id="engine">
+  <div class="split">
+    <div>
+      <h2>Grammar correction runs on the device</h2>
+      <p class="body"><code>lib/data/services/grammar_engine.dart</code> is a rule engine covering the mistakes learners actually make: subject–verb agreement with irregular and <em>-ies</em>/<em>-es</em> forms, tense after <em>did</em>, articles by vowel <em>sound</em>, uncountable nouns, double negatives, double comparatives, and a set of common Indian-English idioms.</p>
+      <p class="body">Running locally is what makes real-time correction viable — there is no round trip between finishing a sentence and seeing the fix. Rules are ordered most-specific-first and each span is corrected at most once, so overlapping rules cannot produce contradictory advice. When several rules fire, each contributes its own explanation but they share one fully-corrected sentence.</p>
+      <div class="figures">
+        <div><b>22</b><span>Correction tests, both directions</span></div>
+        <div><b>52</b><span>Tests in the suite</span></div>
+        <div><b>0</b><span>Issues from flutter analyze</span></div>
+      </div>
+    </div>
+
+    <div>
+      <p class="note" style="margin-bottom:1.1rem">Both directions have to hold</p>
+      <ul class="verdicts">
+        <li>
+          <span class="mark mark--fix">Fix</span>
+          <div>
+            <span class="sentence">Did you <del>went</del> <ins>go</ins> there?</span>
+            <p class="why">“Did” already marks the past, so the next verb stays in its base form.</p>
+          </div>
+        </li>
+        <li>
+          <span class="mark mark--fix">Fix</span>
+          <div>
+            <span class="sentence">I have a <del>doubt</del> <ins>question</ins></span>
+            <p class="why">For a question in class or a meeting, English uses “question”. “Doubt” means you do not believe something.</p>
+          </div>
+        </li>
+        <li>
+          <span class="mark mark--keep">Keep</span>
+          <div>
+            <span class="sentence">I doubt it will rain</span>
+            <p class="why">Scoped tightly. “I doubt it” is perfectly correct English and must not be flagged.</p>
+          </div>
+        </li>
+        <li>
+          <span class="mark mark--keep">Keep</span>
+          <div>
+            <span class="sentence">everyday English</span>
+            <p class="why">“Everyday” (one word) is an adjective. Flagged only when no noun follows, so this is left alone.</p>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ══ VECTORS ════════════════════════════════════════════════ -->
+<section>
+  <div class="split">
+    <div>
+      <h2>The visuals are vectors, not assets</h2>
+      <p class="body">The splash orb, the VOIX mark, the waveform, every chart and the level badge are <code>CustomPainter</code>s. The app ships no raster art beyond the launcher icon, so it stays crisp at every density and the mark can animate its own stroke.</p>
+      <p class="body">The aurora backdrop deliberately avoids <code>BackdropFilter</code>: it paints three oversized radial blooms into one layer. Stacked blur filters are the usual reason a dark gradient UI drops frames on mid-range Android.</p>
+    </div>
+    <div>
+      <h2>Voice degrades, never blocks</h2>
+      <p class="body"><code>SpeechService</code> guards every platform call. No recogniser, a denied permission, or a plain emulator all resolve to the same outcome: the conversation screen switches to typed input and says why. The core feature is never unreachable.</p>
+      <p class="body">Colours are a <code>ThemeExtension</code>, so widgets read <code>context.colors.textSecondary</code> and get the right value for the active brightness without branching. Motion is 160 / 260 / 420 ms — short on purpose.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ══ SCENARIOS ══════════════════════════════════════════════ -->
+<section>
+  <h2>Thirteen roleplay scenarios</h2>
+  <p class="lede">Eight standard settings, five written in Gen-Z register. Each opens with its own first line and three suggested replies.</p>
+
+  <div class="deck">
+    <article class="card"><span class="idx">01</span><h3>Free Conversation</h3><p>Talk about anything on your mind</p></article>
+    <article class="card"><span class="idx">02</span><h3>Ordering Food at a Restaurant</h3><p>Order, ask questions, handle the bill</p></article>
+    <article class="card"><span class="idx">03</span><h3>Job Interview Practice</h3><p>Answer common interview questions</p></article>
+    <article class="card"><span class="idx">04</span><h3>Talking About My Weekend</h3><p>Practise past tense naturally</p></article>
+    <article class="card"><span class="idx">05</span><h3>Shopping for Clothes</h3><p>Sizes, prices, asking for help</p></article>
+    <article class="card"><span class="idx">06</span><h3>At the Doctor</h3><p>Describe symptoms clearly</p></article>
+    <article class="card"><span class="idx">07</span><h3>At the Airport</h3><p>Check-in, security, directions</p></article>
+    <article class="card"><span class="idx">08</span><h3>Giving a Presentation</h3><p>Open, explain, handle questions</p></article>
+    <article class="card"><span class="tag tag--genz">Gen-Z</span><span class="idx">09</span><h3>Group Chat Energy</h3><p>Keep up with fast, casual texting talk</p></article>
+    <article class="card"><span class="tag tag--genz">Gen-Z</span><span class="idx">10</span><h3>Hyping Up a Friend</h3><p>Compliments that sound natural, not cringe</p></article>
+    <article class="card"><span class="tag tag--genz">Gen-Z</span><span class="idx">11</span><h3>Gaming Voice Chat</h3><p>Callouts, banter, gaming vocabulary</p></article>
+    <article class="card"><span class="tag tag--genz">Gen-Z</span><span class="idx">12</span><h3>Reacting to Posts</h3><p>Comment like a native, not a bot</p></article>
+    <article class="card"><span class="tag tag--genz">Gen-Z</span><span class="idx">13</span><h3>Casual to Formal Switch</h3><p>Know when to drop the slang</p></article>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ══ LESSONS ════════════════════════════════════════════════ -->
+<section>
+  <h2>Fourteen lessons, six exercise types</h2>
+  <p class="lede">Typed Dart in <code>lib/data/content/</code>, not JSON — the catalogue is checked by the compiler.</p>
+
+  <ol class="index">
+    <li><span class="n">01</span><span class="t">Present Simple Basics</span><span class="s">He goes, she does, it works</span></li>
+    <li><span class="n">02</span><span class="t">Talking About Yesterday</span><span class="s">Regular and irregular past verbs</span></li>
+    <li><span class="n">03</span><span class="t">A, An &amp; The</span><span class="s">The small words that trip everyone up</span></li>
+    <li><span class="n">04</span><span class="t">Say It Stronger</span><span class="s">Upgrade good, big and happy</span></li>
+    <li><span class="n">05</span><span class="t">Around the House</span><span class="s">Everyday objects you will actually use</span></li>
+    <li><span class="n">06</span><span class="t">When You Do Not Understand</span><span class="s">Phrases that keep a conversation alive</span></li>
+    <li><span class="n">07</span><span class="t">Small Talk Starters</span><span class="s">Break the ice with anyone</span></li>
+    <li><span class="n">08</span><span class="t">Catching Numbers &amp; Times</span><span class="s">Hear the difference between 15 and 50</span></li>
+    <li><span class="n">09</span><span class="t">Mastering the TH Sound</span><span class="s">Think, this, three, that</span></li>
+    <li><span class="n">10</span><span class="t">Reading a Short Message</span><span class="s">Understand tone, not just words</span></li>
+    <li><span class="n">11</span><span class="t">Writing a Polite Request</span><span class="s">Get a yes without sounding demanding</span></li>
+    <li><span class="n">12</span><span class="t">Gen-Z Starter Pack</span><span class="s">No cap, this one slaps</span></li>
+    <li><span class="n">13</span><span class="t">Texting &amp; Shortforms</span><span class="s">IYKYK, TBH, NGL</span></li>
+    <li><span class="n">14</span><span class="t">Interview Answers That Land</span><span class="s">Tell me about yourself</span></li>
+  </ol>
+</section>
+
+<hr class="rule">
+
+<!-- ══ ACHIEVEMENTS ═══════════════════════════════════════════ -->
+<section>
+  <h2>Twelve achievements</h2>
+  <p class="lede">XP, levels and streaks are computed locally and covered by 22 tests of their own.</p>
+  <ul class="badges">
+    <li>First Conversation</li>
+    <li>Getting Started</li>
+    <li>5-Day Streak</li>
+    <li>Level 5 Reached</li>
+    <li>Word Collector</li>
+    <li>Chatterbox</li>
+    <li>Fortnight Fire</li>
+    <li>Five Hours In</li>
+    <li>Dedicated Learner</li>
+    <li>Double Digits</li>
+    <li>Unstoppable</li>
+    <li>XP Master</li>
+  </ul>
+</section>
+
+<hr class="rule">
+
+<!-- ══ STATE ══════════════════════════════════════════════════ -->
+<section>
+  <h2>What is built, and what is not</h2>
+  <p class="lede">The app runs end to end on a fresh clone. Three things still need wiring, and this is the list.</p>
+
+  <div class="state-wrap">
+  <table class="state">
+    <thead><tr><th scope="col">Area</th><th scope="col">State</th></tr></thead>
+    <tbody>
+      <tr><td>Splash, onboarding (11 steps), auth</td><td class="done">Complete</td></tr>
+      <tr><td>Home, Learn, Practice, Progress, Profile</td><td class="done">Complete</td></tr>
+      <tr><td>AI conversation and coaching report</td><td class="done">Complete, on-device</td></tr>
+      <tr><td>14 lessons / 6 exercise types</td><td class="done">Complete</td></tr>
+      <tr><td>13 roleplay scenarios (Standard + Gen-Z)</td><td class="done">Complete</td></tr>
+      <tr><td>XP, levels, streaks, 12 achievements</td><td class="done">Complete</td></tr>
+      <tr><td>Settings, notifications, privacy, help</td><td class="done">Complete</td></tr>
+      <tr><td>Speech-to-text / text-to-speech</td><td class="done">Complete (device engines)</td></tr>
+      <tr><td>Google / Apple sign-in</td><td class="todo">Needs Firebase — see docs/FIREBASE_SETUP.md</td></tr>
+      <tr><td>Push notification delivery</td><td class="todo">Needs a plugin — see docs/BACKEND.md</td></tr>
+      <tr><td>Play Billing for Pro</td><td class="todo">Not wired — see docs/BACKEND.md</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ══ RUN IT ═════════════════════════════════════════════════ -->
+<section>
+  <div class="split">
+    <div>
+      <h2>Run it</h2>
+      <p class="body">No backend, no API keys, no config files. Requires Flutter 3.35+ (Dart 3.5+).</p>
+      <pre><b>$</b> git clone https://github.com/nagachaitanyanagachaitanya695-dot/voix
+<b>$</b> cd voix
+<b>$</b> flutter pub get
+<b>$</b> flutter run</pre>
+    </div>
+    <div>
+      <h2>Check it</h2>
+      <p class="body">The widget tests use a tall surface and repeated pumps rather than <code>pumpAndSettle</code> — the aurora and orb animate forever by design, so the tree never quiesces.</p>
+      <pre><b>$</b> flutter analyze   <span>#</span> 0 issues
+<b>$</b> flutter test      <span>#</span> 52 tests</pre>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footgrid">
+    <div>
+      <h3>Architecture</h3>
+      <ul>
+        <li>features → providers → data → core</li>
+        <li>Nothing points back up</li>
+        <li>AuthRepository and AiTutorService are interfaces with one wiring point each in lib/providers/app_providers.dart</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Design tokens</h3>
+      <ul>
+        <li>Brand ramp #22D8F0 → #3B7BFF → #8B5CF6</li>
+        <li>Plus Jakarta Sans for UI, Manrope for figures</li>
+        <li>Motion 160 / 260 / 420 ms</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Accessibility</h3>
+      <ul>
+        <li>OS text scaling honoured up to 1.3×</li>
+        <li>Semantic labels on icon buttons, charts, achievements and score rings</li>
+        <li>Cards size to a minimum height, so larger text grows the layout instead of clipping it</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Licence</h3>
+      <ul>
+        <li>Fonts: Plus Jakarta Sans and Manrope, SIL Open Font License 1.1</li>
+      </ul>
+      <p style="margin-top:1.2rem"><a href="https://github.com/nagachaitanyanagachaitanya695-dot/voix">github.com/nagachaitanyanagachaitanya695-dot/voix</a></p>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ══════════════════════════════════════════════════════════════
+     A riso press, simulated.
+
+     The scene renders each correction as text painted into a canvas
+     texture, where the RGB channels are not colour — they are ink
+     separations. Red channel = pink plate, green = teal plate,
+     blue = black plate. Quads are drawn with additive blending, so
+     overlapping type accumulates coverage exactly the way overprinted
+     ink does.
+
+     A second pass screens each plate through its own rotated dot
+     grid, offsets it a couple of pixels off-register, and multiplies
+     it down onto paper. Everything is stepped to 12 frames a second.
+     ══════════════════════════════════════════════════════════════ */
+
+  var CARDS = [
+    { wrong: 'Did you went there?',        right: 'Did you go there?',
+      why:   '"Did" already marks the past, so the next verb stays in its base form.' },
+    { wrong: 'I have went there',          right: 'I have gone there',
+      why:   'The past participle of "go" is "gone": I have gone.' },
+    { wrong: 'He go to work',              right: 'He goes to work',
+      why:   'With he / she / it in the simple present, the verb takes -s.' },
+    { wrong: 'Let us discuss about it',    right: 'Let us discuss it',
+      why:   '"Discuss" already means "talk about" - drop the "about".' },
+    { wrong: 'I need more informations',   right: 'I need more information',
+      why:   'This is an uncountable noun in English - it has no plural form.' },
+    { wrong: 'Many peoples came',          right: 'Many people came',
+      why:   '"People" is already plural.' },
+    { wrong: 'This is more better',        right: 'This is better',
+      why:   'Do not use "more" with a word that is already comparative.' },
+    { wrong: 'I have a doubt',             right: 'I have a question',
+      why:   'For a question in class or a meeting, English uses "question".' },
+    { wrong: 'I am out of station',        right: 'I am out of town',
+      why:   'Native speakers say "out of town".' },
+    { wrong: 'Please revert back',         right: 'Please revert',
+      why:   'The "back" / "again" is already contained in the verb.' },
+    { wrong: 'I met an university friend', right: 'I met a university friend',
+      why:   'Use "a" when the next word starts with a consonant sound.' },
+    { wrong: 'I am having two brothers',   right: 'I have two brothers',
+      why:   'For things you own or relationships, use "I have" - not "I am having".' },
+    { wrong: 'I have been here since 2 years', right: 'I have been here for 2 years',
+      why:   'Use "for" with a length of time and "since" with a starting point.' },
+    { wrong: 'What is your good name?',    right: "What's your name?",
+      why:   'Adding "good" sounds unusual in English.' },
+    { wrong: "I didn't see nothing",       right: "I didn't see anything",
+      why:   'English uses one negative per clause.' },
+    { wrong: 'Please do the needful',      right: 'Please take care of it',
+      why:   'Say specifically what you need - e.g. "please take a look".' }
+  ];
+
+  var canvas = document.getElementById('riso');
+  var gl = canvas.getContext('webgl2', { alpha: false, antialias: false });
+  if (!gl) { document.body.classList.add('no-webgl'); return; }
+
+  /* ── Shaders ────────────────────────────────────────────────── */
+
+  var CARD_VS = [
+    '#version 300 es',
+    'in vec2 aPos;',
+    'uniform mat4 uProj;',
+    'uniform mat4 uModel;',
+    'out vec2 vUv;',
+    'void main(){',
+    '  vUv = aPos + 0.5;',
+    '  gl_Position = uProj * uModel * vec4(aPos, 0.0, 1.0);',
+    '}'
+  ].join('\n');
+
+  // The texture already carries its ink separation in RGB, premultiplied.
+  var CARD_FS = [
+    '#version 300 es',
+    'precision highp float;',
+    'in vec2 vUv;',
+    'uniform sampler2D uTex;',
+    'uniform float uFade;',
+    'out vec4 frag;',
+    'void main(){',
+    '  vec4 t = texture(uTex, vec2(vUv.x, 1.0 - vUv.y));',
+    '  frag = vec4(t.rgb * uFade, t.a * uFade);',
+    '}'
+  ].join('\n');
+
+  var POST_VS = [
+    '#version 300 es',
+    'in vec2 aPos;',
+    'out vec2 vUv;',
+    'void main(){',
+    '  vUv = aPos * 0.5 + 0.5;',
+    '  gl_Position = vec4(aPos, 0.0, 1.0);',
+    '}'
+  ].join('\n');
+
+  var POST_FS = [
+    '#version 300 es',
+    'precision highp float;',
+    'in vec2 vUv;',
+    'uniform sampler2D uScene;',
+    'uniform vec2  uRes;',
+    'uniform float uTime;',
+    'out vec4 frag;',
+
+    'const vec3 PAPER = vec3(0.910, 0.878, 0.753);',
+    'const vec3 PINK  = vec3(1.000, 0.000, 0.430);',
+    'const vec3 TEAL  = vec3(0.000, 0.760, 0.660);',
+    'const vec3 BLACK = vec3(0.130, 0.120, 0.105);',
+
+    'float hash(vec2 p){',
+    '  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);',
+    '}',
+
+    // One ink plate: sample off-register, then screen it through a
+    // rotated dot grid whose dot radius tracks coverage.
+    'float plate(int ch, vec2 off, float angle, float freq){',
+    '  vec2 uv = vUv + off / uRes;',
+    '  vec3 s = texture(uScene, uv).rgb;',
+    '  float cov = ch == 0 ? s.r : (ch == 1 ? s.g : s.b);',
+    '  cov = clamp(cov * 1.28, 0.0, 1.0);',
+    '  float c = cos(angle), sn = sin(angle);',
+    '  vec2 p = vec2(gl_FragCoord.x * c - gl_FragCoord.y * sn,',
+    '               gl_FragCoord.x * sn + gl_FragCoord.y * c) / freq;',
+    '  float d = length(fract(p) - 0.5);',
+    '  float r = sqrt(cov) * 0.72;',
+    '  return 1.0 - smoothstep(r - 0.10, r + 0.10, d);',
+    '}',
+
+    'void main(){',
+    // Misregistration wanders a little each stepped frame, like a hand-fed press.
+    '  float j = (hash(vec2(uTime, 3.0)) - 0.5) * 1.6;',
+    '  float k = (hash(vec2(uTime, 9.0)) - 0.5) * 1.6;',
+    '  float aP = plate(0, vec2( 2.4 + j, -1.1 + k), 0.2618, 5.4);',
+    '  float aT = plate(1, vec2(-2.2 + k,  1.5 + j), 1.3090, 5.4);',
+    '  float aB = plate(2, vec2( 0.3,      0.3    ), 0.7854, 4.9);',
+
+    '  vec3 col = PAPER;',
+    '  col = mix(col, col * TEAL,  aT);',
+    '  col = mix(col, col * PINK,  aP);',
+    '  col = mix(col, col * BLACK, aB);',
+
+    // Paper grain and toner fall-off.
+    '  float g = hash(floor(gl_FragCoord.xy * 0.7) + uTime * 13.0);',
+    '  col += (g - 0.5) * 0.055;',
+    '  float v = distance(vUv, vec2(0.5)) ;',
+    '  col *= 1.0 - smoothstep(0.42, 0.95, v) * 0.30;',
+    '  frag = vec4(col, 1.0);',
+    '}'
+  ].join('\n');
+
+  /* ── GL plumbing ────────────────────────────────────────────── */
+
+  function compile(src, type) {
+    var sh = gl.createShader(type);
+    gl.shaderSource(sh, src);
+    gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+      throw new Error(gl.getShaderInfoLog(sh));
+    }
+    return sh;
+  }
+  function program(vs, fs) {
+    var p = gl.createProgram();
+    gl.attachShader(p, compile(vs, gl.VERTEX_SHADER));
+    gl.attachShader(p, compile(fs, gl.FRAGMENT_SHADER));
+    gl.bindAttribLocation(p, 0, 'aPos');
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+      throw new Error(gl.getProgramInfoLog(p));
+    }
+    return p;
+  }
+
+  var cardProg, postProg;
+  try {
+    cardProg = program(CARD_VS, CARD_FS);
+    postProg = program(POST_VS, POST_FS);
+  } catch (e) {
+    document.body.classList.add('no-webgl');
+    return;
+  }
+
+  var quad = gl.createVertexArray();
+  gl.bindVertexArray(quad);
+  var buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER,
+    new Float32Array([-0.5, -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, 0.5]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+  var fsQuad = gl.createVertexArray();
+  gl.bindVertexArray(fsQuad);
+  var fsBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, fsBuf);
+  gl.bufferData(gl.ARRAY_BUFFER,
+    new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.bindVertexArray(null);
+
+  var uProj  = gl.getUniformLocation(cardProg, 'uProj');
+  var uModel = gl.getUniformLocation(cardProg, 'uModel');
+  var uTex   = gl.getUniformLocation(cardProg, 'uTex');
+  var uFade  = gl.getUniformLocation(cardProg, 'uFade');
+  var uScene = gl.getUniformLocation(postProg, 'uScene');
+  var uRes   = gl.getUniformLocation(postProg, 'uRes');
+  var uTimeP = gl.getUniformLocation(postProg, 'uTime');
+
+  /* ── Card textures: type painted straight into ink plates ───── */
+
+  var TEX_W = 1024, TEX_H = 512;
+  var PLATE_PINK  = '#FF0000';   // red channel   -> pink plate
+  var PLATE_TEAL  = '#00FF00';   // green channel -> teal plate
+  var PLATE_BLACK = '#0000FF';   // blue channel  -> black plate
+
+  function fitFont(ctx, text, weightStyle, family, start, maxW) {
+    var size = start;
+    do {
+      ctx.font = weightStyle + ' ' + size + 'px ' + family;
+      if (ctx.measureText(text).width <= maxW) break;
+      size -= 2;
+    } while (size > 20);
+    return size;
+  }
+
+  function wrap(ctx, text, maxW) {
+    var words = text.split(' '), lines = [], line = '';
+    for (var i = 0; i < words.length; i++) {
+      var test = line ? line + ' ' + words[i] : words[i];
+      if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = words[i]; }
+      else { line = test; }
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  function makeTexture(card, index) {
+    var c = document.createElement('canvas');
+    c.width = TEX_W; c.height = TEX_H;
+    var ctx = c.getContext('2d');
+    var M = 64, maxW = TEX_W - M * 2;
+
+    // Exercise number, pink plate.
+    ctx.fillStyle = PLATE_PINK;
+    ctx.font = 'bold 34px "Courier New", monospace';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(('0' + (index + 1)).slice(-2), M, 60);
+
+    // What the learner said — teal plate, Times, struck through in pink.
+    var ws = fitFont(ctx, card.wrong, 'italic', '"Times New Roman", Times, serif', 62, maxW);
+    ctx.fillStyle = PLATE_TEAL;
+    ctx.fillText(card.wrong, M, 156);
+    var wWidth = ctx.measureText(card.wrong).width;
+
+    ctx.strokeStyle = PLATE_PINK;
+    ctx.lineWidth = 7;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(M - 8, 140);
+    ctx.quadraticCurveTo(M + wWidth * 0.5, 130 + (index % 2 ? 9 : -6), M + wWidth + 10, 137);
+    ctx.stroke();
+
+    // The correction — black plate, Helvetica, the loudest thing on the card.
+    var rs = fitFont(ctx, card.right, 'bold', 'Helvetica, Arial, sans-serif', 78, maxW);
+    ctx.fillStyle = PLATE_BLACK;
+    ctx.fillText(card.right, M, 156 + rs + 40);
+
+    // Why — teal plate, Courier, wrapped.
+    ctx.font = '27px "Courier New", Courier, monospace';
+    ctx.fillStyle = PLATE_TEAL;
+    var lines = wrap(ctx, card.why, maxW);
+    var y = 156 + rs + 118;
+    for (var i = 0; i < lines.length && i < 3; i++) {
+      ctx.fillText(lines[i], M, y + i * 38);
+    }
+
+    // Underline beneath the correction, black plate.
+    ctx.strokeStyle = PLATE_BLACK;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(M, 156 + rs + 58);
+    ctx.lineTo(M + Math.min(maxW, 320), 156 + rs + 58 + (index % 2 ? 4 : -3));
+    ctx.stroke();
+
+    var tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return tex;
+  }
+
+  var textures = CARDS.map(makeTexture);
+
+  /* ── Matrices ───────────────────────────────────────────────── */
+
+  function perspective(fovy, aspect, near, far) {
+    var f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
+    return [f / aspect, 0, 0, 0,
+            0, f, 0, 0,
+            0, 0, (far + near) * nf, -1,
+            0, 0, 2 * far * near * nf, 0];
+  }
+  function multiply(a, b) {
+    var o = new Array(16);
+    for (var c = 0; c < 4; c++) {
+      for (var r = 0; r < 4; r++) {
+        o[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] +
+                       a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
+      }
+    }
+    return o;
+  }
+  function translate(x, y, z) {
+    return [1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1];
+  }
+  function rotateY(t) {
+    var c = Math.cos(t), s = Math.sin(t);
+    return [c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1];
+  }
+  function rotateZ(t) {
+    var c = Math.cos(t), s = Math.sin(t);
+    return [c,s,0,0, -s,c,0,0, 0,0,1,0, 0,0,0,1];
+  }
+  function scale(x, y) {
+    return [x,0,0,0, 0,y,0,0, 0,0,1,0, 0,0,0,1];
+  }
+  function smoothstep(e0, e1, x) {
+    var t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
+    return t * t * (3 - 2 * t);
+  }
+
+  /* ── Framebuffer ────────────────────────────────────────────── */
+
+  var fbo = gl.createFramebuffer();
+  var sceneTex = gl.createTexture();
+  var fbW = 0, fbH = 0;
+
+  function resizeTarget(w, h) {
+    if (w === fbW && h === fbH) return;
+    fbW = w; fbH = h;
+    gl.bindTexture(gl.TEXTURE_2D, sceneTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, sceneTex, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+
+  var W = 0, H = 0;
+  function resize() {
+    var dpr = Math.min(window.devicePixelRatio || 1, 1.75);
+    var w = Math.max(1, Math.round(canvas.clientWidth * dpr));
+    var h = Math.max(1, Math.round(canvas.clientHeight * dpr));
+    if (w === W && h === H) return;
+    W = w; H = h;
+    canvas.width = w; canvas.height = h;
+    resizeTarget(w, h);
+  }
+
+  /* ── Interaction ────────────────────────────────────────────── */
+
+  var spin = 0, velocity = 0, dragging = false, lastX = 0, scrollSpin = 0;
+
+  function pointerDown(e) {
+    dragging = true;
+    lastX = (e.touches ? e.touches[0].clientX : e.clientX);
+    velocity = 0;
+  }
+  function pointerMove(e) {
+    if (!dragging) return;
+    var x = (e.touches ? e.touches[0].clientX : e.clientX);
+    var dx = x - lastX;
+    lastX = x;
+    velocity = -dx * 0.0055;
+    spin += velocity;
+  }
+  function pointerUp() { dragging = false; }
+
+  canvas.addEventListener('mousedown', pointerDown);
+  window.addEventListener('mousemove', pointerMove);
+  window.addEventListener('mouseup', pointerUp);
+  canvas.addEventListener('touchstart', pointerDown, { passive: true });
+  canvas.addEventListener('touchmove', pointerMove, { passive: true });
+  canvas.addEventListener('touchend', pointerUp);
+
+  window.addEventListener('scroll', function () {
+    scrollSpin = window.scrollY * 0.0022;
+  }, { passive: true });
+
+  /* ── Draw, stepped to 12 fps ────────────────────────────────── */
+
+  var STEP = 1 / 12;
+  var N = CARDS.length;
+  var RADIUS = 3.6;
+  var CAM_Z = 7.6;
+  var HALF_FOV_TAN = Math.tan(Math.PI / 8);   // 45deg fov
+  var OFF_X = 1.25, OFF_Y = 0.25;   // ring sits up and to the right of the masthead
+  var lastStep = -1;
+
+  var reduce = window.matchMedia &&
+               window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function frame(now) {
+    requestAnimationFrame(frame);
+
+    var stepped = Math.floor((now / 1000) / STEP);
+    if (stepped === lastStep) return;   // hold the frame — stop-motion, not smooth
+    lastStep = stepped;
+    var t = stepped * STEP;
+
+    resize();
+
+    if (!dragging) {
+      spin += reduce ? 0 : 0.010;
+      spin += velocity;
+      velocity *= 0.94;
+    }
+
+    // ── Pass 1: ink plates into the framebuffer ──
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.viewport(0, 0, W, H);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE);   // overprinting: coverage adds
+    gl.disable(gl.DEPTH_TEST);
+
+    gl.useProgram(cardProg);
+    gl.bindVertexArray(quad);
+
+    var aspect = W / H;
+    var proj = perspective(Math.PI / 4, aspect, 0.1, 40);
+    var view = translate(0, 0, -CAM_Z);
+    var vp = multiply(proj, view);
+    gl.uniformMatrix4fv(uProj, false, new Float32Array(vp));
+    gl.uniform1i(uTex, 0);
+    gl.activeTexture(gl.TEXTURE0);
+
+    // Size the card off the frustum at the front of the ring, so a portrait
+    // phone gets a card that fits its width instead of one cropped by it.
+    var halfWView = (CAM_Z - RADIUS) * HALF_FOV_TAN * aspect;
+    var portrait  = aspect < 1.0;
+    var cardW = Math.min(2.30, halfWView * 1.88);
+    var cardH = cardW * (TEX_H / TEX_W);
+    var ox = portrait ? 0 : OFF_X;
+    var oy = portrait ? 0.85 : OFF_Y;
+    // A full-width portrait card cannot share the stage with its neighbours,
+    // so portrait snaps the ring to whole card positions and prints one at a
+    // time — a slide advancing, rather than a carousel sliding.
+    var fadeLo = portrait ? 0.93 : 0.62;
+    var fadeHi = portrait ? 0.999 : 0.95;
+    var stepAngle = Math.PI * 2 / N;
+    var ring = spin + scrollSpin;
+    if (portrait) ring = Math.round(ring / stepAngle) * stepAngle;
+
+    for (var i = 0; i < N; i++) {
+      var a = ring + (i / N) * Math.PI * 2;
+      var ca = Math.cos(a), sa = Math.sin(a);
+      // Only the leading two or three cards print; the rest of the ring is
+      // off-press. Keeps the deck legible instead of a wall of overprint.
+      var fade = smoothstep(fadeLo, fadeHi, ca);
+      if (fade <= 0.01) continue;
+
+      // Off-grid tilt, deterministic per card.
+      var tilt = ((i * 37 % 11) - 5) * 0.013;
+      var lift = Math.sin(i * 2.4) * (portrait ? 0.18 : 0.52);
+      var pop  = 1 + Math.max(0, ca) * 0.08;
+
+      var m = multiply(translate(sa * RADIUS + ox, lift + oy, ca * RADIUS), rotateY(a));
+      m = multiply(m, rotateZ(tilt));
+      m = multiply(m, scale(cardW * pop, cardH * pop));
+
+      gl.uniformMatrix4fv(uModel, false, new Float32Array(m));
+      gl.uniform1f(uFade, fade);
+      gl.bindTexture(gl.TEXTURE_2D, textures[i]);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+
+    // ── Pass 2: screen the plates onto paper ──
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, W, H);
+    gl.disable(gl.BLEND);
+    gl.useProgram(postProg);
+    gl.bindVertexArray(fsQuad);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, sceneTex);
+    gl.uniform1i(uScene, 0);
+    gl.uniform2f(uRes, W, H);
+    gl.uniform1f(uTimeP, t);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
