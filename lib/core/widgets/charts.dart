@@ -191,48 +191,72 @@ class _Bar extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            AnimatedOpacity(
-              duration: Motion.base,
-              opacity: selected ? 1 : 0,
-              child: _Tooltip(text: '${datum.value.round()} $unitLabel'),
-            ),
-            Gap.h4,
             Expanded(
               child: LayoutBuilder(
                 builder: (_, box) {
-                  final target = grown ? box.maxHeight * ratio : 0.0;
+                  // The value rides directly on top of its own bar, so the
+                  // numbers step up and down with the week rather than sitting
+                  // in a detached row. Reserving the label's height keeps a
+                  // full-height bar from pushing its own number off the top.
+                  const labelHeight = 20.0;
+                  final usable = math.max(0.0, box.maxHeight - labelHeight);
+                  final target = grown ? usable * ratio : 0.0;
                   return Align(
                     alignment: Alignment.bottomCenter,
-                    child: AnimatedContainer(
-                      duration: Duration(milliseconds: 600 + index * 60),
-                      curve: Curves.easeOutCubic,
-                      height: math.max(target, isEmpty ? 3 : 6),
-                      width: 14,
-                      decoration: BoxDecoration(
-                        gradient: isEmpty
-                            ? null
-                            : (selected
-                                ? VoixGradients.brand
-                                : LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      VoixPaletteRef.barTop,
-                                      VoixPaletteRef.barBottom,
-                                    ],
-                                  )),
-                        color: isEmpty ? c.border : null,
-                        borderRadius: BorderRadius.circular(6),
-                        boxShadow: selected
-                            ? [
-                                BoxShadow(
-                                  color: c.primary.withValues(alpha: 0.45),
-                                  blurRadius: 14,
-                                  spreadRadius: -3,
-                                ),
-                              ]
-                            : null,
-                      ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          height: labelHeight,
+                          child: AnimatedOpacity(
+                            duration: Motion.base,
+                            opacity: isEmpty ? 0.0 : 1.0,
+                            child: Text(
+                              '${datum.value.round()}',
+                              style: context.text.labelSmall?.copyWith(
+                                color: selected
+                                    ? c.textPrimary
+                                    : c.textSecondary,
+                                fontWeight: selected
+                                    ? FontWeight.w800
+                                    : FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                        AnimatedContainer(
+                          duration: Duration(milliseconds: 600 + index * 60),
+                          curve: Curves.easeOutCubic,
+                          height: math.max(target, isEmpty ? 3 : 6),
+                          width: 18,
+                          decoration: BoxDecoration(
+                            gradient: isEmpty
+                                ? null
+                                : (selected
+                                    ? VoixGradients.brand
+                                    : LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          VoixPaletteRef.barTop,
+                                          VoixPaletteRef.barBottom,
+                                        ],
+                                      )),
+                            color: isEmpty ? c.border : null,
+                            borderRadius: BorderRadius.circular(6),
+                            boxShadow: selected
+                                ? [
+                                    BoxShadow(
+                                      color:
+                                          c.primary.withValues(alpha: 0.45),
+                                      blurRadius: 14,
+                                      spreadRadius: -3,
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                        ),
+                      ],
                     ),
                   );
                 },
@@ -262,32 +286,6 @@ abstract final class VoixPaletteRef {
   static const barBottom = Color(0xFF3B3BE8);
 }
 
-class _Tooltip extends StatelessWidget {
-  const _Tooltip({required this.text});
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: c.surfaceHigh,
-        borderRadius: Radii.rXs,
-        border: Border.all(color: c.borderStrong),
-      ),
-      child: Text(
-        text,
-        style: context.text.labelSmall?.copyWith(
-          color: c.textPrimary,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-/// Circular score dial used for fluency / pronunciation / confidence.
 class ScoreRing extends StatelessWidget {
   const ScoreRing({
     super.key,

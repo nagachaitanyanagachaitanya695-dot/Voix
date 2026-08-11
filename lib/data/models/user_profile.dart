@@ -143,17 +143,28 @@ class UserProfile {
   final bool hapticsEnabled;
 
   // ── Derived level maths ────────────────────────────────────────────────
-  // Each level costs 250 XP more than the last, so early levels come fast and
-  // later ones stretch out — the standard progression curve for daily-habit
-  // apps.
-  static const _baseCost = 500;
-  static const _stepCost = 250;
+  // The first few levels are cheap so a new learner sees progress on day one,
+  // then the cost settles at a flat 250 XP per level.
+  //
+  // The numbers are pinned to the design: 1,250 XP must read as Level 8 with
+  // 250 XP to Level 9. That falls out of costs of 50, 100, 150, 200, then 250
+  // from level 5 onward — cumulative 0, 50, 150, 300, 500, 750, 1000, 1250,
+  // 1500. Change these and the screens stop matching the design.
+  static const _flatCost = 250;
+  static const _rampStep = 50;
 
+  /// Total XP required to *reach* [level]. Level 1 starts at 0.
   static int xpForLevel(int level) {
-    // Total XP required to *reach* [level] (level 1 starts at 0).
     if (level <= 1) return 0;
+    // Below the point where the ramp reaches the flat cost, this is the sum of
+    // an arithmetic series; above it, that sum plus a flat run.
+    const rampLevels = _flatCost ~/ _rampStep; // 5
     final n = level - 1;
-    return n * _baseCost + _stepCost * (n * (n - 1)) ~/ 2;
+    if (n <= rampLevels) {
+      return _rampStep * n * (n + 1) ~/ 2;
+    }
+    const rampTotal = _rampStep * rampLevels * (rampLevels + 1) ~/ 2;
+    return rampTotal + _flatCost * (n - rampLevels);
   }
 
   int get level {
@@ -176,12 +187,15 @@ class UserProfile {
 
   /// Human-readable rank shown next to the level badge.
   String get levelTitle {
+    // Level 8 must read "Fluent Speaker" — it is what the design shows beside
+    // 1,250 XP.
     final l = level;
-    if (l >= 20) return 'Native-Like';
-    if (l >= 15) return 'Fluent Speaker';
-    if (l >= 10) return 'Advanced';
-    if (l >= 6) return 'Intermediate';
-    if (l >= 3) return 'Elementary';
+    if (l >= 16) return 'Native-Like';
+    if (l >= 12) return 'Master';
+    if (l >= 8) return 'Fluent Speaker';
+    if (l >= 6) return 'Advanced';
+    if (l >= 4) return 'Intermediate';
+    if (l >= 2) return 'Elementary';
     return 'Beginner';
   }
 

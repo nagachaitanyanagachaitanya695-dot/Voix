@@ -9,6 +9,19 @@ abstract final class VoixType {
   static const display = 'PlusJakartaSans';
   static const numeric = 'Manrope';
 
+  /// Scripts neither [display] nor [numeric] covers.
+  ///
+  /// Both are Latin-only, so a Telugu, Hindi or Tamil string hits a missing
+  /// glyph and renders as boxes. Flutter walks this list in order for any
+  /// character the primary family cannot draw, which means the language
+  /// pickers and native-language explanations work without the app having to
+  /// know which script it is about to lay out.
+  static const scriptFallback = <String>[
+    'NotoSansTelugu',
+    'NotoSansDevanagari',
+    'NotoSansTamil',
+  ];
+
   static TextTheme textTheme(Color primary, Color secondary) {
     TextStyle base(
       double size,
@@ -19,6 +32,7 @@ abstract final class VoixType {
     }) {
       return TextStyle(
         fontFamily: display,
+        fontFamilyFallback: scriptFallback,
         fontSize: size,
         fontWeight: weight,
         height: height,
@@ -56,6 +70,7 @@ abstract final class VoixType {
   static TextStyle stat(double size, {Color? color, FontWeight weight = FontWeight.w800}) {
     return TextStyle(
       fontFamily: numeric,
+      fontFamilyFallback: scriptFallback,
       fontSize: size,
       fontWeight: weight,
       height: 1.0,

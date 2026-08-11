@@ -60,6 +60,29 @@ flutter:
           weight: 700
         - asset: assets/fonts/PlusJakartaSans-800.ttf
           weight: 800
+    # Indic scripts. Plus Jakarta Sans and Manrope are Latin-only, so without
+    # these every native language name — తెలుగు, हिन्दी, தமிழ் — renders as
+    # empty boxes. That is the app's own audience reading its own language as
+    # rubble, so these ship with the app rather than relying on whatever the
+    # device happens to have.
+    - family: NotoSansTelugu
+      fonts:
+        - asset: assets/fonts/NotoSansTelugu-400.ttf
+          weight: 400
+        - asset: assets/fonts/NotoSansTelugu-700.ttf
+          weight: 700
+    - family: NotoSansDevanagari
+      fonts:
+        - asset: assets/fonts/NotoSansDevanagari-400.ttf
+          weight: 400
+        - asset: assets/fonts/NotoSansDevanagari-700.ttf
+          weight: 700
+    - family: NotoSansTamil
+      fonts:
+        - asset: assets/fonts/NotoSansTamil-400.ttf
+          weight: 400
+        - asset: assets/fonts/NotoSansTamil-700.ttf
+          weight: 700
     # Numeric / stat typeface — tighter, tabular-feeling for XP, streaks, scores.
     - family: Manrope
       fonts:

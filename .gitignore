@@ -56,3 +56,7 @@ lib/firebase_options.dart
 # Backend URL and app token, injected with --dart-define-from-file.
 # Never commit the real one.
 env.json
+
+# Flutter web build output. The web target exists only so the app can be run
+# and screenshotted without an Android device; it is not shipped.
+/build/

@@ -10,20 +10,47 @@ void main() {
       expect(const UserProfile(id: 'u', name: 'A', xp: 0).level, 1);
     });
 
-    test('thresholds increase by a widening step', () {
-      final l2 = UserProfile.xpForLevel(2);
-      final l3 = UserProfile.xpForLevel(3);
-      final l4 = UserProfile.xpForLevel(4);
-      expect(l2, 500);
-      // Each level costs 250 more than the previous one.
-      expect(l3 - l2, greaterThan(l2));
-      expect(l4 - l3, greaterThan(l3 - l2));
+    test('thresholds match the design exactly', () {
+      // These are not arbitrary: the Progress screen in the design shows
+      // 1,250 XP as Level 8 with 250 XP to Level 9. Every number below is
+      // pinned to that, so a change here is a change to the design.
+      const expected = {
+        1: 0,
+        2: 50,
+        3: 150,
+        4: 300,
+        5: 500,
+        6: 750,
+        7: 1000,
+        8: 1250,
+        9: 1500,
+        10: 1750,
+      };
+      expected.forEach((level, xp) {
+        expect(UserProfile.xpForLevel(level), xp, reason: 'level $level');
+      });
+    });
+
+    test('cost per level ramps, then flattens at 250', () {
+      final costs = [
+        for (var l = 1; l <= 9; l++)
+          UserProfile.xpForLevel(l + 1) - UserProfile.xpForLevel(l),
+      ];
+      expect(costs, [50, 100, 150, 200, 250, 250, 250, 250, 250]);
+    });
+
+    test('1,250 XP reads as Level 8, Fluent Speaker, 250 to go', () {
+      // The exact row from the design's Progress screen.
+      const learner = UserProfile(id: 'u', name: 'A', xp: 1250);
+      expect(learner.level, 8);
+      expect(learner.levelTitle, 'Fluent Speaker');
+      expect(learner.xpToNextLevel, 250);
     });
 
     test('level rises as XP crosses each threshold', () {
       UserProfile at(int xp) => UserProfile(id: 'u', name: 'A', xp: xp);
-      expect(at(499).level, 1);
-      expect(at(500).level, 2);
+      expect(at(49).level, 1);
+      expect(at(50).level, 2);
       expect(at(UserProfile.xpForLevel(5)).level, 5);
       expect(at(UserProfile.xpForLevel(5) - 1).level, 4);
     });
@@ -49,8 +76,12 @@ void main() {
           UserProfile(id: 'u', name: 'A', xp: UserProfile.xpForLevel(level))
               .levelTitle;
       expect(titleAt(1), 'Beginner');
-      expect(titleAt(6), 'Intermediate');
-      expect(titleAt(15), 'Fluent Speaker');
+      expect(titleAt(2), 'Elementary');
+      expect(titleAt(4), 'Intermediate');
+      expect(titleAt(6), 'Advanced');
+      expect(titleAt(8), 'Fluent Speaker');
+      expect(titleAt(12), 'Master');
+      expect(titleAt(16), 'Native-Like');
     });
   });
 
