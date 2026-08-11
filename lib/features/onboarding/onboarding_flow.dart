@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -545,7 +547,6 @@ class _ComingSoonStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: Gap.page),
       child: Column(
@@ -564,7 +565,11 @@ class _ComingSoonStep extends StatelessWidget {
                     amplitude: 0.2,
                     colors: const [VoixPalette.violet, VoixPalette.magenta],
                   ),
-                  const Text('🌍', style: TextStyle(fontSize: 56)),
+                  // Drawn rather than set as an emoji: the design shows a
+                  // ringed planet, and an emoji would render as whatever glyph
+                  // the device happens to have — or as a box on devices with
+                  // no emoji font at all.
+                  const _Planet(size: 96),
                 ],
               ),
             ),
@@ -573,7 +578,7 @@ class _ComingSoonStep extends StatelessWidget {
           FadeSlideIn(
             index: 2,
             child: Text(
-              'More Languages\nComing Soon',
+              'Other Languages\nComing Soon!',
               textAlign: TextAlign.center,
               style: context.text.displaySmall?.copyWith(height: 1.2),
             ),
@@ -582,44 +587,115 @@ class _ComingSoonStep extends StatelessWidget {
           FadeSlideIn(
             index: 3,
             child: Text(
-              "We're building Spanish, French and Japanese next.\n"
-              'English is ready for you today.',
+              "We're working on adding more languages.\nStay tuned!",
               textAlign: TextAlign.center,
               style: context.text.bodyMedium,
             ),
           ),
-          Gap.h24,
-          FadeSlideIn(
-            index: 4,
-            child: Wrap(
-              spacing: Gap.xs,
-              runSpacing: Gap.xs,
-              alignment: WrapAlignment.center,
-              children: [
-                for (final l in LanguageCatalog.upcoming)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: Gap.sm,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: c.surface,
-                      borderRadius: Radii.rPill,
-                      border: Border.all(color: c.border),
-                    ),
-                    child: Text(
-                      '${l.flag}  ${l.name}',
-                      style: context.text.labelMedium
-                          ?.copyWith(color: c.textSecondary),
-                    ),
-                  ),
-              ],
-            ),
-          ),
+          // No language chips here. The design has none, and they carried
+          // country-flag emoji — which Android does not render on most
+          // devices, so they showed as empty boxes rather than flags.
         ],
       ),
     );
   }
+}
+
+/// A ringed planet, for the "more languages" step.
+class _Planet extends StatelessWidget {
+  const _Planet({required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      dimension: size,
+      child: CustomPaint(painter: _PlanetPainter()),
+    );
+  }
+}
+
+class _PlanetPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final centre = Offset(size.width / 2, size.height / 2);
+    final radius = size.shortestSide * 0.32;
+    final bounds = Rect.fromCircle(center: centre, radius: radius);
+
+    // Body: lit from the top-left, so it reads as a sphere rather than a disc.
+    canvas.drawCircle(
+      centre,
+      radius,
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment(-0.4, -0.5),
+          radius: 1.0,
+          colors: [Color(0xFF7DD3FC), VoixPalette.blue, Color(0xFF3B2E8F)],
+          stops: [0.0, 0.55, 1.0],
+        ).createShader(bounds),
+    );
+
+    // Two bands, clipped to the body.
+    canvas
+      ..save()
+      ..clipPath(Path()..addOval(bounds));
+    final band = Paint()..color = Colors.white.withValues(alpha: 0.14);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: centre.translate(0, -radius * 0.25),
+        width: radius * 2.4,
+        height: radius * 0.34,
+      ),
+      band,
+    );
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: centre.translate(0, radius * 0.42),
+        width: radius * 2.0,
+        height: radius * 0.26,
+      ),
+      band,
+    );
+    canvas.restore();
+
+    // The ring, tilted and drawn in two halves so it passes behind the planet
+    // at the back and in front of it at the near side.
+    final ringRect = Rect.fromCenter(
+      center: centre,
+      width: radius * 3.4,
+      height: radius * 1.1,
+    );
+    final ringPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.shortestSide * 0.045
+      ..strokeCap = StrokeCap.round
+      ..shader = const LinearGradient(
+        colors: [VoixPalette.violet, VoixPalette.magenta, VoixPalette.violet],
+      ).createShader(ringRect);
+
+    canvas
+      ..save()
+      ..translate(centre.dx, centre.dy)
+      ..rotate(-0.32)
+      ..translate(-centre.dx, -centre.dy)
+      // Back half first…
+      ..drawArc(ringRect, math.pi, math.pi, false, ringPaint)
+      ..restore();
+
+    // …the planet is already painted over it, so only the near half is drawn
+    // again on top.
+    canvas
+      ..save()
+      ..translate(centre.dx, centre.dy)
+      ..rotate(-0.32)
+      ..translate(-centre.dx, -centre.dy)
+      ..drawArc(ringRect, 0, math.pi, false, ringPaint)
+      ..restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _VoiceStep extends StatelessWidget {

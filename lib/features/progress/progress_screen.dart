@@ -7,6 +7,7 @@ import '../../core/theme/app_typography.dart';
 import '../../core/utils/context_ext.dart';
 import '../../core/widgets/charts.dart';
 import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/menu_button.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/staggered.dart';
@@ -18,6 +19,7 @@ import '../../data/models/user_profile.dart';
 import '../../providers/activity_controller.dart';
 import '../../providers/session_controller.dart';
 import '../../providers/user_controller.dart';
+import '../profile/settings_screen.dart';
 import '../practice/conversation_summary_screen.dart';
 import 'achievements_screen.dart';
 
@@ -64,6 +66,13 @@ class _ProgressScreenState extends ConsumerState<ProgressScreen> {
               padding: const EdgeInsets.fromLTRB(Gap.page, Gap.md, Gap.page, 0),
               child: Row(
                 children: [
+                  MenuButton(
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const SettingsScreen(),
+                      ),
+                    ),
+                  ),
                   Expanded(
                     child: Text('Progress', style: context.text.displaySmall),
                   ),

@@ -9,6 +9,7 @@ import '../../core/utils/context_ext.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/gradient_widgets.dart';
+import '../../core/widgets/menu_button.dart';
 import '../../core/widgets/mic_button.dart';
 import '../../core/widgets/pressable.dart';
 import '../../core/widgets/staggered.dart';
@@ -75,6 +76,13 @@ class PracticeScreen extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(Gap.page, Gap.md, Gap.page, 0),
               child: Row(
                 children: [
+                  MenuButton(
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const SettingsScreen(),
+                      ),
+                    ),
+                  ),
                   Expanded(
                     child: Text('Practice', style: context.text.displaySmall),
                   ),
