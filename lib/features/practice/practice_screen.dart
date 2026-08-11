@@ -15,6 +15,7 @@ import '../../core/widgets/staggered.dart';
 import '../../data/models/user_profile.dart';
 import '../../providers/session_controller.dart';
 import '../../providers/user_controller.dart';
+import '../learn/learn_page.dart';
 import '../onboarding/widgets/option_tile.dart';
 import '../profile/premium_screen.dart';
 import '../profile/settings_screen.dart';
@@ -218,8 +219,11 @@ class PracticeScreen extends ConsumerWidget {
                             title: 'Grammar, Vocabulary,\nPhrases & Slang',
                             caption:
                                 'Get real-time corrections and smart suggestions',
-                            onTap: () =>
-                                AppShell.jumpTo(context, ShellTab.learn),
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const LearnPage(),
+                              ),
+                            ),
                           ),
                         ),
                         Gap.w12,

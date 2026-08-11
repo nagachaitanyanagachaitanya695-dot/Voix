@@ -17,6 +17,7 @@ import '../../providers/user_controller.dart';
 import '../learn/lesson_player_screen.dart';
 import '../practice/conversation_screen.dart';
 import '../practice/scenario_picker_sheet.dart';
+import '../learn/learn_page.dart';
 import '../shell/app_shell.dart';
 
 /// The daily dashboard: where the learner lands and decides what to do next.
@@ -145,7 +146,9 @@ class HomeScreen extends ConsumerWidget {
             index: 2,
             child: _SectionRow(
               title: 'Continue Learning',
-              onAction: () => AppShell.jumpTo(context, ShellTab.learn),
+              onAction: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const LearnPage()),
+              ),
             ),
           ),
           FadeSlideIn(
@@ -223,7 +226,9 @@ class HomeScreen extends ConsumerWidget {
                     title: 'Learn',
                     caption: 'Grammar, vocab & phrases',
                     gradient: VoixGradients.brandSoft,
-                    onTap: () => AppShell.jumpTo(context, ShellTab.learn),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const LearnPage()),
+                    ),
                   ),
                   _QuickTile(
                     icon: Icons.description_rounded,

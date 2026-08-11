@@ -187,9 +187,15 @@ void main() {
 
     expect(find.textContaining('Hi, Hrithik'), findsOneWidget);
 
-    await tester.tap(find.text('Learn').last);
+    // Four tabs, matching the design — lessons are reached from the Practice
+    // grid and from Home, not from the bar. Asserted on the stack rather than
+    // on label text, because Home has its own "Learn" shortcut tile.
+    final stack = tester.widget<IndexedStack>(find.byType(IndexedStack));
+    expect(stack.children, hasLength(4));
+
+    await tester.tap(find.text('Practice').last);
     await _settle(tester);
-    expect(find.text('Gen-Z Dictionary'), findsOneWidget);
+    expect(find.text('Choose Mode'), findsOneWidget);
 
     await tester.tap(find.text('Profile').last);
     await _settle(tester);

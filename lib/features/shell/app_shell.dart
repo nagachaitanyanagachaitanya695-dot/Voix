@@ -6,16 +6,15 @@ import '../../core/utils/context_ext.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/aurora_background.dart';
 import '../home/home_screen.dart';
-import '../learn/learn_screen.dart';
 import '../practice/practice_screen.dart';
 import '../profile/profile_screen.dart';
 import '../progress/progress_screen.dart';
 
 /// Index of each root tab. Exposed so other screens can deep-link
 /// (`AppShell.jumpTo(context, ShellTab.practice)`).
-enum ShellTab { home, learn, practice, progress, profile }
+enum ShellTab { home, practice, progress, profile }
 
-/// Root container: five tabs behind one persistent nav bar.
+/// Root container: four tabs behind one persistent nav bar.
 ///
 /// Pages are kept alive in an [IndexedStack] so scroll position, chart
 /// selections and in-progress lesson state survive tab switches — moving
@@ -57,7 +56,6 @@ class _AppShellState extends ConsumerState<AppShell> {
           index: _index,
           children: const [
             HomeScreen(),
-            LearnScreen(),
             PracticeScreen(),
             ProgressScreen(),
             ProfileScreen(),
@@ -85,9 +83,10 @@ class _VoixNavBar extends StatelessWidget {
   final int index;
   final ValueChanged<int> onSelect;
 
+  // Four tabs, matching the design. Lessons are not a tab: they are reached
+  // from the Practice grid and from Home, and pushed as a full page.
   static const _items = [
     _NavItem(Icons.home_outlined, Icons.home_rounded, 'Home'),
-    _NavItem(Icons.menu_book_outlined, Icons.menu_book_rounded, 'Learn'),
     _NavItem(Icons.mic_none_rounded, Icons.mic_rounded, 'Practice'),
     _NavItem(Icons.bar_chart_outlined, Icons.bar_chart_rounded, 'Progress'),
     _NavItem(Icons.person_outline_rounded, Icons.person_rounded, 'Profile'),
