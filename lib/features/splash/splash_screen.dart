@@ -174,7 +174,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                               child: VoixLogo(
                                 size: markSize,
                                 filled: true,
-                                cutoutColor: VoixPalette.darkBg,
                               ),
                             ),
                           ],

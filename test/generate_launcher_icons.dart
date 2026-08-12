@@ -23,9 +23,9 @@ import 'package:voix/core/widgets/voix_logo.dart';
 /// flag every one of these would run as an equality assertion on binary output,
 /// which is not what the file is for.
 void main() {
-  // The icon plate. Deliberately a flat colour rather than a gradient: the
-  // adaptive foreground knocks the microphone out in this exact value, and a
-  // gradient plate would leave the knockout visibly mismatched.
+  // The icon plate, matching the near-black ground of the supplied brand icon.
+  // Flat rather than a gradient so the adaptive background layer, which can
+  // only be a single colour, stays identical to the legacy plate.
   const plate = Color(0xFF0B1022);
 
   /// Android's five bucket densities, as multiples of the mdpi baseline.
@@ -53,7 +53,7 @@ void main() {
           color: plate,
           borderRadius: BorderRadius.circular(legacy * 0.22),
         ),
-        child: Center(child: VoixLogo(size: legacy * 0.74, cutoutColor: plate)),
+        child: Center(child: VoixLogo(size: legacy * 0.74)),
       ),
     );
 
@@ -66,7 +66,7 @@ void main() {
       size: adaptive,
       path: '$res/mipmap-$bucket/ic_launcher_foreground.png',
       child: Center(
-        child: VoixLogo(size: adaptive * (60 / 108), cutoutColor: plate),
+        child: VoixLogo(size: adaptive * (60 / 108)),
       ),
     );
 
@@ -83,9 +83,8 @@ void main() {
           filled: false,
           strokeScale: 1.15,
           gradient: const LinearGradient(colors: [Colors.white, Colors.white]),
-          // Unused in outline mode, but VoixLogo falls back to the ambient
-          // theme when it is null and there is no theme in this harness.
-          cutoutColor: Colors.transparent,
+          // The system tints this layer, so the bloom would only muddy it.
+          glow: false,
         ),
       ),
     );
@@ -98,7 +97,7 @@ void main() {
     path: '../store/play_icon_512.png',
     child: ColoredBox(
       color: plate,
-      child: const Center(child: VoixLogo(size: 368, cutoutColor: plate)),
+      child: const Center(child: VoixLogo(size: 368)),
     ),
   );
 }

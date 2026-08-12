@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/config/backend_config.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_gradients.dart';
@@ -11,7 +10,6 @@ import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/gradient_widgets.dart';
 import '../../core/widgets/menu_button.dart';
 import '../../core/widgets/mic_button.dart';
-import '../../core/widgets/pressable.dart';
 import '../../core/widgets/staggered.dart';
 import '../../data/models/user_profile.dart';
 import '../../providers/session_controller.dart';
@@ -48,9 +46,10 @@ class PracticeScreen extends ConsumerWidget {
       );
     }
 
-    /// Live speech-to-speech — a Premium feature, and only shown at all when a
-    /// backend exists to serve it. Non-subscribers get the paywall rather than
-    /// a call that would be refused server-side anyway.
+    /// Live speech-to-speech — a Premium feature. Non-subscribers get the
+    /// paywall rather than a call the server would refuse anyway; subscribers
+    /// on a build with no backend reach the call screen, which explains that
+    /// it is not configured.
     Future<void> startLiveCall() async {
       if (!user.isPro) {
         await Navigator.of(context).push(
@@ -204,6 +203,65 @@ class PracticeScreen extends ConsumerWidget {
             ),
           ),
 
+          Gap.h12,
+
+          // ── Live call ─────────────────────────────────────────────
+          // Shown unconditionally, even with no backend. Hiding it meant the
+          // feature was invisible on a build that had not been configured yet,
+          // so nobody could tell it existed — tapping explains what is missing
+          // instead.
+          FadeSlideIn(
+            index: 4,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Gap.page),
+              child: AccentCard(
+                color: VoixPalette.violet,
+                onTap: startLiveCall,
+                padding: const EdgeInsets.all(Gap.md),
+                child: Row(
+                  children: [
+                    const IconTile(
+                      icon: Icons.graphic_eq_rounded,
+                      size: 52,
+                      gradient: VoixGradients.violetMagenta,
+                    ),
+                    Gap.w16,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  'Live Conversation',
+                                  style: context.text.titleMedium,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (!user.isPro) ...[
+                                Gap.w8,
+                                const _PremiumTag(),
+                              ],
+                            ],
+                          ),
+                          Gap.h4,
+                          Text(
+                            'Talk like a phone call — no recording, no '
+                            'sending. Interrupt any time.',
+                            style: context.text.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.chevron_right_rounded, color: c.textTertiary),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
           Gap.h16,
 
           // ── Feature tiles ─────────────────────────────────────────
@@ -310,42 +368,33 @@ class PracticeScreen extends ConsumerWidget {
                     color: c.textSecondary,
                   ),
                 ),
-                if (BackendConfig.isConfigured) ...[
-                  Gap.h20,
-                  Pressable(
-                    onTap: startLiveCall,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: Gap.md,
-                        vertical: Gap.xs,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            user.isPro
-                                ? Icons.graphic_eq_rounded
-                                : Icons.lock_outline_rounded,
-                            size: 18,
-                            color: c.primary,
-                          ),
-                          Gap.w8,
-                          Text(
-                            user.isPro
-                                ? 'Or have a live call'
-                                : 'Live call — Premium',
-                            style: context.text.titleSmall
-                                ?.copyWith(color: c.primary),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Small "Premium" marker on a locked feature.
+class _PremiumTag extends StatelessWidget {
+  const _PremiumTag();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: Gap.xs, vertical: 2),
+      decoration: BoxDecoration(
+        color: VoixPalette.violet.withValues(alpha: 0.18),
+        borderRadius: Radii.rPill,
+      ),
+      child: Text(
+        'Premium',
+        style: context.text.labelSmall?.copyWith(
+          color: VoixPalette.violet,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
