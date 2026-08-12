@@ -77,6 +77,12 @@ class _NavItem {
   final String label;
 }
 
+/// Identifies the nav bar's outer padding so a test can assert it clears the
+/// system gesture inset — the geometry is otherwise hard to pin down, because
+/// the IndexedStack lays out every tab's content behind the visible one.
+@visibleForTesting
+const navBarPaddingKey = Key('voix.navbar.padding');
+
 class _VoixNavBar extends StatelessWidget {
   const _VoixNavBar({required this.index, required this.onSelect});
 
@@ -97,14 +103,21 @@ class _VoixNavBar extends StatelessWidget {
     final c = context.colors;
 
     return Padding(
+      key: navBarPaddingKey,
+      // The scaffold sets extendBody, so this bar is drawn over the system
+      // gesture area rather than above it. The inset has to be added in full:
+      // a fixed token was leaving the bottom of every icon and label sitting
+      // underneath the gesture pill.
       padding: EdgeInsets.fromLTRB(
         Gap.sm,
         0,
         Gap.sm,
-        context.safeArea.bottom > 0 ? Gap.xs : Gap.sm,
+        context.safeArea.bottom + Gap.sm,
       ),
       child: Container(
-        height: 66,
+        // A floor, not a fixed height: the labels grow with the system text
+        // size, and a hard 66 clipped them at large accessibility scales.
+        constraints: const BoxConstraints(minHeight: 66),
         decoration: BoxDecoration(
           color: c.isDark
               ? c.surface.withValues(alpha: 0.94)

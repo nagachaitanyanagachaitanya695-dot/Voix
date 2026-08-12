@@ -177,6 +177,38 @@ void main() {
     expect(find.text('Logout'), findsOneWidget);
   });
 
+  testWidgets('nav bar clears the system gesture bar', (tester) async {
+    // Reported from a real phone: the bottom half of every nav icon was
+    // hidden underneath the gesture pill. The scaffold sets extendBody, so
+    // the bar draws over the system inset and has to add it back in full —
+    // a fixed padding token is not enough on a gesture-navigation device.
+    _setSurface(tester);
+    const inset = 48.0;
+    final container = await _container(user: _seeded);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(
+          padding: EdgeInsets.only(bottom: inset),
+          size: Size(420, 2400),
+        ),
+        child: _host(container, const AppShell()),
+      ),
+    );
+    await _settle(tester);
+
+    final padding =
+        tester.widget<Padding>(find.byKey(navBarPaddingKey)).padding.resolve(
+              TextDirection.ltr,
+            );
+    expect(
+      padding.bottom,
+      greaterThanOrEqualTo(inset),
+      reason: 'the bar must sit above the gesture area, not under it',
+    );
+  });
+
   testWidgets('shell switches tabs without rebuilding state', (tester) async {
     _setSurface(tester);
     final container = await _container(user: _seeded);
