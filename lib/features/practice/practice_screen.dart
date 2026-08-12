@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/config/backend_config.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_gradients.dart';
@@ -36,12 +37,20 @@ class PracticeScreen extends ConsumerWidget {
 
     final lastSummary = ref.watch(latestSummarisedSessionProvider);
 
+    // A live call is the app's real shape: you talk, the tutor talks back,
+    // either of you can cut in. It needs a subscription and a deployed
+    // backend, so the main button only takes that route when both are true —
+    // it must never dead-end into a screen explaining what is missing.
+    final canCallLive = user.isPro && BackendConfig.isConfigured;
+
     Future<void> start() async {
       final scenario = await showScenarioPicker(context, ref);
       if (scenario == null || !context.mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => ConversationScreen(scenario: scenario),
+          builder: (_) => canCallLive
+              ? LiveCallScreen(scenario: scenario)
+              : ConversationScreen(scenario: scenario),
         ),
       );
     }
@@ -182,12 +191,16 @@ class PracticeScreen extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'AI Voice Conversation',
+                            canCallLive
+                                ? 'Live AI Conversation'
+                                : 'AI Voice Conversation',
                             style: context.text.titleMedium,
                           ),
                           Gap.h4,
                           Text(
-                            'Talk with your AI tutor and improve speaking',
+                            canCallLive
+                                ? 'Speak and be answered straight away'
+                                : 'Talk with your AI tutor and improve speaking',
                             style: context.text.bodySmall,
                           ),
                         ],
@@ -206,61 +219,62 @@ class PracticeScreen extends ConsumerWidget {
           Gap.h12,
 
           // ── Live call ─────────────────────────────────────────────
-          // Shown unconditionally, even with no backend. Hiding it meant the
-          // feature was invisible on a build that had not been configured yet,
-          // so nobody could tell it existed — tapping explains what is missing
-          // instead.
-          FadeSlideIn(
-            index: 4,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: Gap.page),
-              child: AccentCard(
-                color: VoixPalette.violet,
-                onTap: startLiveCall,
-                padding: const EdgeInsets.all(Gap.md),
-                child: Row(
-                  children: [
-                    const IconTile(
-                      icon: Icons.graphic_eq_rounded,
-                      size: 52,
-                      gradient: VoixGradients.violetMagenta,
-                    ),
-                    Gap.w16,
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  'Live Conversation',
-                                  style: context.text.titleMedium,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              if (!user.isPro) ...[
-                                Gap.w8,
-                                const _PremiumTag(),
-                              ],
-                            ],
-                          ),
-                          Gap.h4,
-                          Text(
-                            'Talk like a phone call — no recording, no '
-                            'sending. Interrupt any time.',
-                            style: context.text.bodySmall,
-                          ),
-                        ],
+          // Only when the main button is *not* already a live call, so this is
+          // the route in rather than a duplicate. It stays visible on a build
+          // with no backend on purpose: hiding it made the feature impossible
+          // to discover, so tapping explains what is missing instead.
+          if (!canCallLive)
+            FadeSlideIn(
+              index: 4,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: Gap.page),
+                child: AccentCard(
+                  color: VoixPalette.violet,
+                  onTap: startLiveCall,
+                  padding: const EdgeInsets.all(Gap.md),
+                  child: Row(
+                    children: [
+                      const IconTile(
+                        icon: Icons.graphic_eq_rounded,
+                        size: 52,
+                        gradient: VoixGradients.violetMagenta,
                       ),
-                    ),
-                    Icon(Icons.chevron_right_rounded, color: c.textTertiary),
-                  ],
+                      Gap.w16,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    'Live Conversation',
+                                    style: context.text.titleMedium,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (!user.isPro) ...[
+                                  Gap.w8,
+                                  const _PremiumTag(),
+                                ],
+                              ],
+                            ),
+                            Gap.h4,
+                            Text(
+                              'Talk like a phone call — no recording, no '
+                              'sending. Interrupt any time.',
+                              style: context.text.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right_rounded, color: c.textTertiary),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
 
           Gap.h16,
 
@@ -363,7 +377,9 @@ class PracticeScreen extends ConsumerWidget {
                 MicButton(onTap: start, size: 88),
                 Gap.h8,
                 Text(
-                  'Tap to Start Speaking',
+                  canCallLive
+                      ? 'Tap to Start a Live Call'
+                      : 'Tap to Start Speaking',
                   style: context.text.titleSmall?.copyWith(
                     color: c.textSecondary,
                   ),

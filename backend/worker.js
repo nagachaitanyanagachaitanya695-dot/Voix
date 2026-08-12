@@ -166,7 +166,7 @@ async function mintRealtimeToken(request, env, origin) {
         // Server-side so the model and the teaching prompt can change without
         // an app update, and so the app cannot ask for a costlier model.
         model: env.REALTIME_MODEL,
-        instructions: tutorInstructions(body),
+        instructions: tutorInstructions(body, { spoken: true }),
         audio: {
           input: {
             format: { type: 'audio/pcm', rate: 24000 },
@@ -236,7 +236,7 @@ async function chat(request, env, origin) {
  * Lives on the server so it can be improved without an app release — prompt
  * wording is the thing you will tune most often.
  */
-function tutorInstructions(body) {
+function tutorInstructions(body, { spoken = false } = {}) {
   const level = ['beginner', 'intermediate', 'advanced'].includes(body.level)
     ? body.level
     : 'beginner';
@@ -264,7 +264,33 @@ function tutorInstructions(body) {
     `- Never mock a mistake. Praise real progress specifically, not with empty phrases.`,
     ``,
     `If the learner asks a question in ${native}, or asks you to translate something, do it — helping them understand is the job.`,
+    ...(spoken ? _spokenRules(level, native) : []),
   ].join('\n');
+}
+
+/**
+ * Extra rules for the live voice call.
+ *
+ * Speaking is not writing. The learner cannot re-read a correction, cannot see
+ * spelling, and cannot skim — anything not understood the first time is simply
+ * lost. These rules exist so the call teaches rather than merely chats, which
+ * is the whole point of it: it is a language lesson conducted as a phone call,
+ * not an assistant that happens to talk.
+ */
+function _spokenRules(level, native) {
+  return [
+    ``,
+    `You are speaking out loud, on a live call:`,
+    `- Speak slowly and clearly, and keep each turn under about 20 seconds. A learner cannot re-read you.`,
+    `- Leave the learner room to talk. Silence is them thinking, not a cue for you to fill it.`,
+    `- Never spell things out letter by letter or read punctuation aloud.`,
+    `- When you correct something, say the whole corrected sentence back naturally, then move on. Do not stack several corrections into one turn — pick the one that most got in the way of being understood.`,
+    `- If the learner goes quiet or says they are stuck, offer them the sentence to repeat after you. Repetition out loud is how speaking improves.`,
+    `- If you genuinely cannot make out what they said, say so plainly and ask them to say it again. Do not guess and answer the wrong question.`,
+    `- Praise a good sentence the moment it happens, briefly. On a call, encouragement has to be immediate to land.`,
+    `- A ${level} learner will hesitate and restart sentences. Wait. Do not finish their sentences for them.`,
+    `- You may drop one short phrase of ${native} to unblock them, then return to English straight away.`,
+  ];
 }
 
 // ── Budget ────────────────────────────────────────────────────────────────
