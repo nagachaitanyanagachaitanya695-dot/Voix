@@ -1,0 +1,85 @@
+name: Build Android APK
+
+# Builds an installable APK on GitHub's runners, which have the Android SDK.
+# The result is attached to the run as a downloadable artifact and published to
+# a rolling pre-release, so it can be installed on a phone straight from the
+# browser without a development machine.
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          # AGP 8 requires 17. Newer JDKs fail with an obscure Kotlin error
+          # rather than a clear version complaint, so this is pinned.
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          # Pinned to the version the app was developed and tested against.
+          flutter-version: '3.35.5'
+          channel: stable
+          cache: true
+
+      - run: flutter --version
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      # No key.properties in CI, so the release build falls back to debug
+      # signing — installable on a phone, and rejected by Play, which is
+      # exactly what a test build should be.
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Name the build
+        id: name
+        run: echo "name=voix-${GITHUB_SHA::7}.apk" >> "$GITHUB_OUTPUT"
+
+      - name: Rename APK
+        run: mv build/app/outputs/flutter-apk/app-release.apk "${{ steps.name.outputs.name }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voix-apk
+          path: ${{ steps.name.outputs.name }}
+          retention-days: 30
+
+      # A release asset has a direct download URL that works in a phone
+      # browser; a workflow artifact is a zip that phones handle badly.
+      - name: Publish to the test release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: test-build
+          name: Latest test build
+          body: |
+            Automatic test build of Voix.
+
+            **Install:** download the `.apk` below on your Android phone and
+            open it. Android will warn about installing from an unknown
+            source — allow it for your browser, then install.
+
+            Signed with debug keys, so this cannot be uploaded to Play. It is
+            for trying the app on a real device.
+
+            Commit: ${{ github.sha }}
+          files: ${{ steps.name.outputs.name }}
+          prerelease: true
+          make_latest: false
