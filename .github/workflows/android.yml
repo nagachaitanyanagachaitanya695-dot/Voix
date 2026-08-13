@@ -106,6 +106,26 @@ jobs:
           path: voix-*.apk
           retention-days: 30
 
+      # Clear the previous build's files off the release first.
+      #
+      # Assets accumulate otherwise — one APK per commit, all sitting on the
+      # same page under near-identical names. Every older one is signed with a
+      # different throwaway key, so tapping the wrong file gives "App not
+      # installed" and looks like the build is broken. Leaving exactly one set
+      # of files means there is nothing wrong to tap.
+      - name: Remove the previous build's files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view test-build --json assets --jq '.assets[].name' \
+            2>/dev/null > old-assets.txt || true
+          while read -r asset; do
+            [ -n "$asset" ] || continue
+            echo "removing $asset"
+            gh release delete-asset test-build "$asset" --yes || true
+          done < old-assets.txt
+          rm -f old-assets.txt
+
       # A release asset has a direct download URL that works in a phone
       # browser; a workflow artifact is a zip that phones handle badly.
       - name: Publish to the test release
