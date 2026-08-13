@@ -7,5 +7,5 @@
     <!-- The adaptive launcher icon's background layer. Must stay in step with
          the `plate` colour in test/generate_launcher_icons.dart, which knocks
          the microphone out of the foreground in exactly this value. -->
-    <color name="ic_launcher_background">#0B1022</color>
+    <color name="ic_launcher_background">#080C1C</color>
 </resources>

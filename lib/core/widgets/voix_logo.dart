@@ -72,9 +72,11 @@ class _VoixLogoPainter extends CustomPainter {
   final double progress;
   final bool glow;
 
-  // Geometry is authored in a 100×100 box and scaled to the widget size.
-  static const _centre = Offset(42, 44);
-  static const _bubbleR = 28.0;
+  // Geometry is authored in a 100×100 box and scaled to the widget size, with
+  // every coordinate measured off the supplied brand tile. The bubble is
+  // deliberately left of centre: the wave fan needs the right third of the box.
+  static const _centre = Offset(38, 45);
+  static const _bubbleR = 24.0;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -92,61 +94,90 @@ class _VoixLogoPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round
       ..strokeWidth = width * strokeScale;
 
-    // ── Bubble: a ring with a tail, not a filled blob ──────────────────
+    // ── Bubble: one continuous outline — ring plus tail ────────────────
+    // The ring is broken between 112° and 143° and the stroke runs out to the
+    // tail's point and back instead of closing across. Drawing the tail as a
+    // second path over a complete circle leaves a sliver between the two,
+    // which the glow then floods into a solid wedge; this way there is nothing
+    // to trap, and the mark reads as the single unbroken line it is on the
+    // brand tile.
+    const tailStart = 143.0; // lower-left, where the outline leaves the ring
+    const tailEnd = 112.0; //   bottom-left, where it rejoins
+    // The long way round: everything except the span the tail occupies. Skia
+    // normalises a sweep past a full turn, so this has to be the 329° arc,
+    // not 143 − 112 + 360.
+    const ringSweep = 360.0 - (tailStart - tailEnd);
     final bubble = Path()
-      ..addOval(Rect.fromCircle(center: _centre, radius: _bubbleR));
-    // A short pointed tail off the lower-left. Both ends are anchored on the
-    // circle itself — ending short of it made the tail look like it cut
-    // across the microphone.
-    final tail = Path()
-      ..moveTo(23, 64)
-      ..quadraticBezierTo(19, 76, 13, 83)
-      ..quadraticBezierTo(26, 78, 34, 71);
+      ..arcTo(
+        Rect.fromCircle(center: _centre, radius: _bubbleR),
+        tailStart * math.pi / 180,
+        ringSweep * math.pi / 180,
+        true,
+      )
+      // The arc ends at 112°, (29.01, 67.25). Out to the point, then back up
+      // to where the ring was left at 143°, (18.83, 59.44).
+      ..quadraticBezierTo(23, 73.5, 12, 79.5)
+      ..quadraticBezierTo(15, 69, 18.83, 59.44)
+      ..close();
 
     // ── Microphone ─────────────────────────────────────────────────────
+    // A stadium, not a rounded rectangle: on the brand tile the capsule's top
+    // and bottom are full semicircles.
+    const capsuleRect = Rect.fromLTRB(28.5, 29.5, 47.5, 60);
     final capsule = Path()
       ..addRRect(
         RRect.fromRectAndRadius(
-          const Rect.fromLTRB(35, 24, 49, 49),
-          const Radius.circular(7),
+          capsuleRect,
+          const Radius.circular(9.5), // half the capsule's 19-unit width
         ),
       );
-    // The grille lines across the capsule, as on the brand icon.
+    // The grille reads as short ticks against each edge of the capsule with a
+    // clear gap down the middle, not as lines ruled across it.
     final grille = Path();
     for (var i = 0; i < 3; i++) {
-      final y = 32.0 + i * 5.0;
+      final y = 41.5 + i * 4.5;
       grille
-        ..moveTo(37, y)
-        ..lineTo(47, y);
+        ..moveTo(30.0, y)
+        ..lineTo(34.2, y)
+        ..moveTo(42.0, y)
+        ..lineTo(46.2, y);
     }
     // The open U the capsule sits in.
     final cradle = Path()
       ..addArc(
-        Rect.fromCircle(center: const Offset(42, 45), radius: 12),
+        Rect.fromCircle(center: const Offset(38.5, 48.75), radius: 13.75),
         0, // +x axis
         math.pi, // sweep through the bottom half
       );
     final stem = Path()
-      ..moveTo(42, 57)
-      ..lineTo(42, 63);
+      ..moveTo(38.5, 62.5)
+      ..lineTo(38.5, 68);
+    // A short foot, roughly half the capsule's width.
     final base = Path()
-      ..moveTo(34, 63)
-      ..lineTo(50, 63);
+      ..moveTo(34.5, 68)
+      ..lineTo(42.5, 68);
 
     // ── Sound waves: three arcs, as on the brand icon ──────────────────
-    // Revealed last, so on the splash the mark draws itself and *then*
-    // "speaks".
+    // Each arc is concentric with the bubble and fans *wider* than the one
+    // inside it — the near tick is short, the far arc sweeps almost a
+    // quadrant. Revealed last, so on the splash the mark draws itself and
+    // *then* "speaks".
+    const waveArcs = <({double radius, double halfAngle, double width})>[
+      (radius: 32, halfAngle: 17, width: 3.6),
+      (radius: 41, halfAngle: 33, width: 4.0),
+      (radius: 50, halfAngle: 40, width: 4.4),
+    ];
     final waveT = ((progress - 0.55) / 0.45).clamp(0.0, 1.0);
     final waves = <({Path path, double width})>[
-      for (var i = 0; i < 3; i++)
+      for (final arc in waveArcs)
         (
           path: Path()
             ..addArc(
-              Rect.fromCircle(center: _centre, radius: 40.0 + i * 11.0),
-              -(34 - i * 4) * math.pi / 180,
-              (34 - i * 4) * 2 * math.pi / 180,
+              Rect.fromCircle(center: _centre, radius: arc.radius),
+              -arc.halfAngle * math.pi / 180,
+              arc.halfAngle * 2 * math.pi / 180,
             ),
-          width: 4.6 - i * 0.7,
+          width: arc.width,
         ),
     ];
 
@@ -158,19 +189,17 @@ class _VoixLogoPainter extends CustomPainter {
         ..shader = shader
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round
-        ..strokeWidth = 6.0 * strokeScale
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
-      canvas
-        ..drawPath(_trim(bubble, progress), bloom)
-        ..drawPath(_trim(tail, progress), bloom);
+        // Kept narrower than the stroke it sits under: a wide bloom closes the
+        // gap inside the tail and turns the spike into a filled triangle.
+        ..strokeWidth = 3.5 * strokeScale
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+      canvas.drawPath(_trim(bubble, progress), bloom);
       for (final w in waves) {
         if (waveT > 0) canvas.drawPath(_trim(w.path, waveT), bloom);
       }
     }
 
-    canvas
-      ..drawPath(_trim(bubble, progress), stroke(5.0))
-      ..drawPath(_trim(tail, progress), stroke(5.0));
+    canvas.drawPath(_trim(bubble, progress), stroke(4.6));
 
     // The mic is solid in the icon and stroked while the splash draws itself.
     if (filled) {
@@ -181,18 +210,18 @@ class _VoixLogoPainter extends CustomPainter {
         ..drawPath(
           grille,
           Paint()
-            ..color = const Color(0x33000B1F)
+            ..color = const Color(0x4D000B1F)
             ..style = PaintingStyle.stroke
             ..strokeCap = StrokeCap.round
-            ..strokeWidth = 1.6 * strokeScale,
+            ..strokeWidth = 1.8 * strokeScale,
         );
     } else {
-      canvas.drawPath(_trim(capsule, progress), stroke(3.6));
+      canvas.drawPath(_trim(capsule, progress), stroke(3.4));
     }
     canvas
-      ..drawPath(filled ? cradle : _trim(cradle, progress), stroke(3.4))
-      ..drawPath(filled ? stem : _trim(stem, progress), stroke(3.4))
-      ..drawPath(filled ? base : _trim(base, progress), stroke(3.4));
+      ..drawPath(filled ? cradle : _trim(cradle, progress), stroke(3.6))
+      ..drawPath(filled ? stem : _trim(stem, progress), stroke(3.6))
+      ..drawPath(filled ? base : _trim(base, progress), stroke(3.6));
 
     if (waveT > 0) {
       for (final w in waves) {

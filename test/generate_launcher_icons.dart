@@ -26,7 +26,7 @@ void main() {
   // The icon plate, matching the near-black ground of the supplied brand icon.
   // Flat rather than a gradient so the adaptive background layer, which can
   // only be a single colour, stays identical to the legacy plate.
-  const plate = Color(0xFF0B1022);
+  const plate = Color(0xFF080C1C);
 
   /// Android's five bucket densities, as multiples of the mdpi baseline.
   const densities = <String, double>{
@@ -48,13 +48,7 @@ void main() {
       'legacy $bucket',
       size: legacy,
       path: '$res/mipmap-$bucket/ic_launcher.png',
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: plate,
-          borderRadius: BorderRadius.circular(legacy * 0.22),
-        ),
-        child: Center(child: VoixLogo(size: legacy * 0.74)),
-      ),
+      child: _Plate(size: legacy, plate: plate),
     );
 
     // Adaptive layers are authored at 108dp; the launcher masks them down to a
@@ -66,7 +60,7 @@ void main() {
       size: adaptive,
       path: '$res/mipmap-$bucket/ic_launcher_foreground.png',
       child: Center(
-        child: VoixLogo(size: adaptive * (60 / 108)),
+        child: VoixLogo(size: adaptive * (64 / 108)),
       ),
     );
 
@@ -79,7 +73,7 @@ void main() {
       path: '$res/mipmap-$bucket/ic_launcher_monochrome.png',
       child: Center(
         child: VoixLogo(
-          size: adaptive * (58 / 108),
+          size: adaptive * (62 / 108),
           filled: false,
           strokeScale: 1.15,
           gradient: const LinearGradient(colors: [Colors.white, Colors.white]),
@@ -90,16 +84,110 @@ void main() {
     );
   });
 
-  // Play requires exactly 512×512 for the store listing.
+  // Play requires exactly 512×512 for the store listing. Play rounds the
+  // corners itself, so the plate runs edge to edge here rather than being
+  // rounded like the legacy icon.
   _write(
     'play store listing icon',
     size: 512,
     path: '../store/play_icon_512.png',
-    child: ColoredBox(
-      color: plate,
-      child: const Center(child: VoixLogo(size: 368)),
-    ),
+    child: const _Plate(size: 512, plate: plate, radiusFactor: 0),
   );
+}
+
+/// The icon tile: dark plate, a lit top-left rim, and the mark.
+///
+/// The rim is what makes the supplied brand tile read as a lit object rather
+/// than a flat square, so it is drawn rather than dropped.
+class _Plate extends StatelessWidget {
+  const _Plate({
+    required this.size,
+    required this.plate,
+    this.radiusFactor = 0.22,
+  });
+
+  final double size;
+  final Color plate;
+  final double radiusFactor;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(size * radiusFactor);
+    return DecoratedBox(
+      decoration: BoxDecoration(color: plate, borderRadius: radius),
+      child: Stack(
+        children: [
+          // The rim sits inside the plate edge, brightest at the top-left
+          // where the brand gradient starts.
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: radius,
+                border: GradientBoxBorder(
+                  width: size * 0.012,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      const Color(0xFF22D3EE).withValues(alpha: 0.55),
+                      const Color(0xFF3B82F6).withValues(alpha: 0.10),
+                      const Color(0xFF8B5CF6).withValues(alpha: 0.30),
+                    ],
+                    stops: const [0.0, 0.55, 1.0],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Center(child: VoixLogo(size: size * 0.92)),
+        ],
+      ),
+    );
+  }
+}
+
+/// A [BoxBorder] painted with a gradient — Flutter's own [Border] only takes
+/// flat colours, and the tile's rim has to run through the brand ramp.
+class GradientBoxBorder extends BoxBorder {
+  const GradientBoxBorder({required this.gradient, required this.width});
+
+  final Gradient gradient;
+  final double width;
+
+  @override
+  BorderSide get bottom => BorderSide.none;
+  @override
+  BorderSide get top => BorderSide.none;
+  @override
+  bool get isUniform => true;
+  @override
+  EdgeInsetsGeometry get dimensions => EdgeInsets.all(width);
+
+  @override
+  void paint(
+    Canvas canvas,
+    Rect rect, {
+    TextDirection? textDirection,
+    BoxShape shape = BoxShape.rectangle,
+    BorderRadius? borderRadius,
+  }) {
+    final paint = Paint()
+      ..shader = gradient.createShader(rect)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = width;
+    // Inset by half the stroke so the whole rim lands inside the plate rather
+    // than half of it bleeding off the edge of the PNG.
+    final inner = rect.deflate(width / 2);
+    if (borderRadius == null) {
+      canvas.drawRect(inner, paint);
+    } else {
+      canvas.drawRRect(borderRadius.toRRect(inner), paint);
+    }
+  }
+
+  @override
+  ShapeBorder scale(double t) =>
+      GradientBoxBorder(gradient: gradient, width: width * t);
 }
 
 /// Renders [child] into a [size]×[size] surface and writes it to [path].
