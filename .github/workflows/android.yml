@@ -46,20 +46,30 @@ jobs:
       # No key.properties in CI, so the release build falls back to debug
       # signing — installable on a phone, and rejected by Play, which is
       # exactly what a test build should be.
-      - name: Build APK
-        run: flutter build apk --release
+      # Split per ABI. A universal APK carries native code for arm64, arm32 and
+      # x86_64 at once and comes to ~64 MB, of which any given phone uses about
+      # a third. The arm64 slice is ~22 MB and is what every phone sold in the
+      # last several years actually runs.
+      - name: Build APKs
+        run: flutter build apk --release --split-per-abi
 
       - name: Name the build
         id: name
-        run: echo "name=voix-${GITHUB_SHA::7}.apk" >> "$GITHUB_OUTPUT"
+        run: echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
-      - name: Rename APK
-        run: mv build/app/outputs/flutter-apk/app-release.apk "${{ steps.name.outputs.name }}"
+      - name: Rename APKs
+        run: |
+          cd build/app/outputs/flutter-apk
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            src="app-$abi-release.apk"
+            [ -f "$src" ] && mv "$src" "$GITHUB_WORKSPACE/voix-${{ steps.name.outputs.sha }}-$abi.apk"
+          done
+          ls -lh "$GITHUB_WORKSPACE"/voix-*.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: voix-apk
-          path: ${{ steps.name.outputs.name }}
+          path: voix-*.apk
           retention-days: 30
 
       # A release asset has a direct download URL that works in a phone
@@ -72,14 +82,19 @@ jobs:
           body: |
             Automatic test build of Voix.
 
-            **Install:** download the `.apk` below on your Android phone and
-            open it. Android will warn about installing from an unknown
-            source — allow it for your browser, then install.
+            **Which file:** take the `arm64-v8a` one. That is every Android
+            phone sold in roughly the last decade. Only reach for
+            `armeabi-v7a` if that one refuses to install, and `x86_64` is for
+            emulators.
+
+            **Install:** download it on your phone and open it. Android will
+            warn about installing from an unknown source — allow it for your
+            browser, then install.
 
             Signed with debug keys, so this cannot be uploaded to Play. It is
             for trying the app on a real device.
 
             Commit: ${{ github.sha }}
-          files: ${{ steps.name.outputs.name }}
+          files: voix-*.apk
           prerelease: true
           make_latest: false
