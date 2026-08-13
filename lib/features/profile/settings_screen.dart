@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/config/backend_config.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/utils/context_ext.dart';
@@ -11,6 +12,7 @@ import '../../core/widgets/voix_logo.dart';
 import '../../data/models/language.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/user_controller.dart';
+import 'testing_screen.dart';
 import 'widgets/settings_tile.dart';
 
 /// App-level settings: appearance, sound, and about.
@@ -133,6 +135,31 @@ class SettingsScreen extends ConsumerWidget {
                         ],
                       ),
                     ),
+
+                    // Only in a test build. A store release is compiled
+                    // without VOIX_TESTING and never shows this.
+                    if (BackendConfig.isTestingBuild) ...[
+                      Gap.h20,
+                      FadeSlideIn(
+                        index: 3,
+                        child: SettingsGroup(
+                          title: 'Testing',
+                          tiles: [
+                            SettingsTile(
+                              icon: Icons.science_rounded,
+                              title: 'Backend & premium',
+                              subtitle: 'Point this build at your Worker',
+                              iconColor: VoixPalette.cyan,
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const TestingScreen(),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

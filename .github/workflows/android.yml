@@ -46,17 +46,20 @@ jobs:
       # No key.properties in CI, so the release build falls back to debug
       # signing — installable on a phone, and rejected by Play, which is
       # exactly what a test build should be.
-      # Both shapes, because they are for different situations.
       #
-      # The universal APK carries native code for every architecture at once
-      # (~64 MB). It is the one to reach for when you just want the app on a
-      # phone, because it cannot pick the wrong slice.
+      # VOIX_TESTING turns on the in-app testing screen, where the Worker's
+      # address can be typed in. Without it a CI build has no backend at all —
+      # CI cannot hold your secrets — and the live call is unreachable no
+      # matter what else is right. A Play release is built without this flag,
+      # because the screen can unlock Premium locally.
       #
-      # The per-ABI APKs are a third of that. Worth having for a slow
-      # connection, and arm64-v8a covers essentially every phone sold in the
-      # last decade — but a wrong guess there is an app that will not install.
+      # Two shapes are built, for different situations. The universal APK
+      # carries native code for every architecture at once (~64 MB) and is the
+      # one to reach for when you just want the app on a phone, because it
+      # cannot pick the wrong slice. The per-ABI APKs are a third of that,
+      # worth it on a slow connection if you know which one your phone needs.
       - name: Build universal APK
-        run: flutter build apk --release
+        run: flutter build apk --release --dart-define=VOIX_TESTING=true
 
       - name: Name the build
         id: name
@@ -68,7 +71,7 @@ jobs:
              "$GITHUB_WORKSPACE/voix-${{ steps.name.outputs.sha }}.apk"
 
       - name: Build per-ABI APKs
-        run: flutter build apk --release --split-per-abi
+        run: flutter build apk --release --split-per-abi --dart-define=VOIX_TESTING=true
 
       - name: Rename per-ABI APKs
         run: |
@@ -107,6 +110,11 @@ jobs:
             **Install:** download it on your phone and open it. Android will
             warn about installing from an unknown source — allow it for your
             browser, then install.
+
+            **To try the live call:** Profile → Settings → Testing. Paste your
+            Cloudflare Worker's address and its APP_TOKEN, tap "Check
+            connection", then turn on "Unlock Premium". The screen tells you
+            what is wrong if it cannot reach the Worker.
 
             Signed with debug keys, so this cannot be uploaded to Play. It is
             for trying the app on a real device.

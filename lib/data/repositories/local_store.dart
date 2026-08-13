@@ -28,6 +28,12 @@ class LocalStore {
   /// Not a hardware identifier — see `deviceIdProvider`.
   static const kDeviceId = 'voix.deviceId';
 
+  // ── Testing builds only ────────────────────────────────────────────────
+  // Written by the testing screen, which only exists in a build made with
+  // `--dart-define=VOIX_TESTING=true`. A store release never writes these.
+  static const kTestBackendUrl = 'voix.test.backendUrl';
+  static const kTestAppToken = 'voix.test.appToken';
+
   // ── Primitives ─────────────────────────────────────────────────────────
   String? getString(String key) => _prefs.getString(key);
   Future<void> setString(String key, String value) =>

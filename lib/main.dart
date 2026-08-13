@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
+import 'core/config/backend_config.dart';
 import 'data/repositories/local_store.dart';
 import 'firebase_options.dart';
 import 'providers/app_providers.dart';
@@ -18,6 +19,11 @@ Future<void> main() async {
   // synchronously — the app boots straight into real content instead of
   // flashing a loading state over the splash animation.
   final store = await LocalStore.open();
+
+  // A backend address typed in on the testing screen has to be in place before
+  // any controller reads it, or the first tutor reply of the session goes to
+  // the on-device fallback.
+  BackendConfig.restoreFrom(store);
 
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
