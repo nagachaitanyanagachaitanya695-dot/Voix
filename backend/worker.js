@@ -1,22 +1,26 @@
 /**
  * Voix backend — a Cloudflare Worker.
  *
- * Its entire job is to hold the OpenAI API key so the app never has to. An
- * APK is a zip file: a key shipped inside one is a key published. This Worker
- * keeps the key server-side and the app only ever talks to this Worker.
+ * Its entire job is to hold the API keys so the app never has to. An APK is a
+ * zip file: a key shipped inside one is a key published. This Worker keeps the
+ * keys server-side and the app only ever talks to this Worker.
  *
  * Endpoints:
  *   POST /v1/chat    → the tutor's reply, corrections and end-of-session scores
  *   POST /v1/verify  → checks a Play purchase token with Google, grants premium
- *   POST /v1/session → an ephemeral live-voice token, subscribers only
+ *   POST /v1/session → credentials for a live voice call, subscribers only
  *
  * For everyone, speech is handled by the phone itself — Android's own
  * recogniser turns it into text and its text-to-speech reads the reply back.
- * That costs nothing. Live voice-to-voice streams audio to OpenAI and is
- * billed per minute in both directions, which is why it is the paid feature
- * and why /v1/session refuses anyone this Worker has not verified as a
- * subscriber. The app also hides it from non-subscribers, but that is a
- * courtesy, not the control: an APK can be edited, this Worker cannot.
+ * That costs nothing. A live call streams audio in both directions and is
+ * billed per minute, which is why it is the paid feature and why /v1/session
+ * refuses anyone this Worker has not verified as a subscriber. The app also
+ * hides it from non-subscribers, but that is a courtesy, not the control: an
+ * APK can be edited, this Worker cannot.
+ *
+ * The live call can run on either of two providers, chosen by which secrets
+ * you set — see `liveSession`. The app is told which one it got and speaks
+ * that protocol; nothing else in the app changes.
  *
  * Deploy instructions: backend/README.md
  */
@@ -27,6 +31,7 @@
 const APP_TOKEN_HEADER = 'x-voix-app-token';
 
 const OPENAI = 'https://api.openai.com/v1';
+const ELEVENLABS = 'https://api.elevenlabs.io/v1';
 
 export default {
   async fetch(request, env, ctx) {
@@ -38,9 +43,9 @@ export default {
     if (request.method !== 'POST') {
       return json({ error: 'Use POST.' }, 405, origin);
     }
-    if (!env.OPENAI_API_KEY) {
-      return json({ error: 'Server is not configured.' }, 500, origin);
-    }
+    // Not checked globally: a deploy that only has an ElevenLabs key can still
+    // run live calls, and the app falls back to its own on-device tutor for
+    // text. Each endpoint checks the key it actually needs.
 
     // ── Auth ───────────────────────────────────────────────────────────
     if (env.APP_TOKEN && request.headers.get(APP_TOKEN_HEADER) !== env.APP_TOKEN) {
@@ -65,7 +70,7 @@ export default {
         case '/v1/verify':
           return await verifyPurchase(request, env, origin);
         case '/v1/session':
-          return await mintRealtimeToken(request, env, origin);
+          return await liveSession(request, env, origin);
         default:
           return json({ error: 'Unknown endpoint.' }, 404, origin);
       }
@@ -140,10 +145,27 @@ async function verifyPurchase(request, env, origin) {
  * The returned `ek_...` value expires in about a minute, so a stolen one is
  * worth almost nothing, which is why the app is never given the real key.
  */
-async function mintRealtimeToken(request, env, origin) {
+/**
+ * Credentials for one live call.
+ *
+ * Two providers are supported and the server picks, so switching does not need
+ * an app release:
+ *
+ *   ElevenLabs Agents — preferred when configured. Turn-taking, interruption,
+ *     speech recognition and the voice are all handled by the agent, which is
+ *     configured at elevenlabs.io rather than here. The teaching prompt lives
+ *     on the agent; the per-learner details travel as dynamic variables.
+ *   OpenAI Realtime — the fallback. The teaching prompt is sent from here.
+ *
+ * Either way the credential is short-lived and minted per call, so the app
+ * never holds anything worth stealing.
+ */
+async function liveSession(request, env, origin) {
   const body = await safeJson(request);
   const userId = String(body.userId ?? '');
 
+  // The gate. Fails closed: no verified entitlement, no call. This is the only
+  // check that matters — the app's own paywall is just the polite version.
   if (!(await hasPremium(env, userId))) {
     return json(
       { error: 'Live voice is part of Voix Premium.', code: 'not_subscribed' },
@@ -152,6 +174,52 @@ async function mintRealtimeToken(request, env, origin) {
     );
   }
 
+  if (env.ELEVENLABS_API_KEY && env.ELEVENLABS_AGENT_ID) {
+    return await elevenLabsSession(env, origin);
+  }
+  if (env.OPENAI_API_KEY) {
+    return await openAiSession(body, env, origin, userId);
+  }
+  return json({ error: 'Live voice is not configured.' }, 500, origin);
+}
+
+/**
+ * A signed WebSocket URL for the ElevenLabs agent.
+ *
+ * The agent has `enable_auth` on, so this URL is the only way in. It is
+ * single-use and expires in minutes; without it the agent id alone is
+ * worthless, which is what stops someone unpacking the APK and running up a
+ * bill on your account.
+ */
+async function elevenLabsSession(env, origin) {
+  const response = await fetch(
+    `${ELEVENLABS}/convai/conversation/get-signed-url` +
+      `?agent_id=${encodeURIComponent(env.ELEVENLABS_AGENT_ID)}`,
+    { headers: { 'xi-api-key': env.ELEVENLABS_API_KEY } },
+  );
+
+  if (!response.ok) {
+    console.error('signed-url failed', response.status, await response.text());
+    return json({ error: 'Could not start a voice session.' }, 502, origin);
+  }
+
+  const data = await response.json();
+  return json(
+    {
+      provider: 'elevenlabs',
+      url: data.signed_url,
+      // The agent is configured for 16 kHz in both directions. Sent rather
+      // than hard-coded in the app so changing it in the ElevenLabs dashboard
+      // does not need an app release — a mismatch here is not an error, it is
+      // chipmunk audio.
+      sampleRate: 16000,
+    },
+    200,
+    origin,
+  );
+}
+
+async function openAiSession(body, env, origin, userId) {
   const response = await fetch(`${OPENAI}/realtime/client_secrets`, {
     method: 'POST',
     headers: {
@@ -192,7 +260,13 @@ async function mintRealtimeToken(request, env, origin) {
 
   const data = await response.json();
   return json(
-    { token: data.value, expiresAt: data.expires_at, model: env.REALTIME_MODEL },
+    {
+      provider: 'openai',
+      token: data.value,
+      expiresAt: data.expires_at,
+      model: env.REALTIME_MODEL,
+      sampleRate: 24000,
+    },
     200,
     origin,
   );
@@ -200,6 +274,9 @@ async function mintRealtimeToken(request, env, origin) {
 
 /** The tutor: one reply, or one end-of-session report. */
 async function chat(request, env, origin) {
+  if (!env.OPENAI_API_KEY) {
+    return json({ error: 'The tutor is unavailable right now.' }, 503, origin);
+  }
   const body = await safeJson(request);
 
   const response = await fetch(`${OPENAI}/chat/completions`, {

@@ -9,7 +9,22 @@ import 'package:record/record.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../core/config/backend_config.dart';
+import '../models/language.dart';
 import '../models/user_profile.dart';
+
+/// Which service is carrying the call.
+///
+/// The backend decides and tells the app, so the provider can be swapped by
+/// changing a secret rather than shipping a new APK. The two speak entirely
+/// different WebSocket protocols; everything above this file is unaffected.
+enum LiveProvider {
+  /// ElevenLabs Agents. Turn-taking, transcription and the voice belong to the
+  /// agent, configured in the ElevenLabs dashboard.
+  elevenLabs,
+
+  /// OpenAI Realtime. The teaching prompt is sent by our backend at mint time.
+  openAi,
+}
 
 /// Where a live voice call is in its lifecycle.
 enum VoiceCallState {
@@ -40,6 +55,62 @@ enum VoiceCallError {
   unknown,
 }
 
+/// What the backend handed back for one call.
+///
+/// Parsed defensively: a backend that has been redeployed with a different
+/// provider, or an older one that predates the `provider` field, must not
+/// crash the call — it should either work or fail cleanly.
+@immutable
+class LiveSession {
+  const LiveSession({
+    required this.provider,
+    required this.sampleRate,
+    this.token,
+    this.model,
+    this.url,
+  });
+
+  final LiveProvider provider;
+  final int sampleRate;
+  final String? token;
+  final String? model;
+  final String? url;
+
+  /// Returns null if the response cannot start a call.
+  static LiveSession? parse(Map<String, dynamic> data) {
+    final url = data['url'] as String?;
+    final token = data['token'] as String?;
+    final model = data['model'] as String?;
+
+    // A backend deployed before this field existed only ever spoke OpenAI, and
+    // said so by sending a token and a model.
+    final provider = switch (data['provider'] as String?) {
+      'elevenlabs' => LiveProvider.elevenLabs,
+      'openai' => LiveProvider.openAi,
+      _ => url != null ? LiveProvider.elevenLabs : LiveProvider.openAi,
+    };
+
+    final rate = (data['sampleRate'] as num?)?.toInt() ??
+        (provider == LiveProvider.elevenLabs ? 16000 : 24000);
+
+    switch (provider) {
+      case LiveProvider.elevenLabs:
+        if (url == null || url.isEmpty) return null;
+      case LiveProvider.openAi:
+        if (token == null || token.isEmpty) return null;
+        if (model == null || model.isEmpty) return null;
+    }
+
+    return LiveSession(
+      provider: provider,
+      sampleRate: rate,
+      token: token,
+      model: model,
+      url: url,
+    );
+  }
+}
+
 /// One completed exchange, emitted when the tutor finishes a turn.
 @immutable
 class VoiceExchange {
@@ -65,15 +136,43 @@ class RealtimeVoiceService {
   RealtimeVoiceService({
     AudioRecorder? recorder,
     http.Client? httpClient,
-  })  : _recorder = recorder ?? AudioRecorder(),
-        _http = httpClient ?? http.Client();
+    @visibleForTesting LiveProvider? provider,
+  })  : _injectedRecorder = recorder,
+        _http = httpClient ?? http.Client(),
+        _provider = provider ?? LiveProvider.openAi;
 
-  final AudioRecorder _recorder;
+  /// Reads a `/v1/session` response. Exposed because getting this wrong shows
+  /// up as a call that connects and then transcribes nothing.
+  @visibleForTesting
+  static LiveSession? parseSession(Map<String, dynamic> data) =>
+      LiveSession.parse(data);
+
+  final AudioRecorder? _injectedRecorder;
+  AudioRecorder? _ownRecorder;
+
+  /// Built on first use, not in the constructor: constructing an
+  /// [AudioRecorder] opens a platform channel, so an eager one would reach for
+  /// the microphone plugin merely because the screen was built.
+  AudioRecorder get _recorder =>
+      _injectedRecorder ?? (_ownRecorder ??= AudioRecorder());
+
+  /// Whether the microphone was ever actually opened. Guards teardown so
+  /// [stop] does not make platform calls for a call that never began.
+  bool _audioStarted = false;
+
   final http.Client _http;
 
-  /// 24 kHz mono PCM16 — what the Realtime API expects in both directions.
-  /// Changing this silently produces chipmunk audio rather than an error.
-  static const _sampleRate = 24000;
+  /// Mono PCM16 rate for both directions, told to us by the backend because it
+  /// differs per provider (24 kHz for OpenAI, 16 kHz for the ElevenLabs
+  /// agent). Getting this wrong does not raise an error — it produces
+  /// chipmunk audio — so it is never guessed.
+  int _sampleRate = 24000;
+
+  LiveProvider _provider;
+
+  /// Which service carried the last call. Exposed for diagnostics only; no UI
+  /// depends on it, because the learner should not have to care.
+  LiveProvider get provider => _provider;
 
   final state = ValueNotifier(VoiceCallState.idle);
 
@@ -103,6 +202,14 @@ class RealtimeVoiceService {
   /// begins. See [_suppressPlayback].
   bool _interrupted = false;
 
+  /// Fires once the tutor's audio has stopped arriving.
+  ///
+  /// OpenAI marks the end of a turn with `response.done`. The ElevenLabs agent
+  /// has no equivalent event — audio simply stops — so the only way to know it
+  /// has finished speaking is that no chunk has arrived for a moment.
+  Timer? _speechTail;
+  static const _speechTailGap = Duration(milliseconds: 900);
+
   // Accumulates the in-progress turn so a completed exchange can be emitted.
   final _learnerBuffer = StringBuffer();
   final _tutorBuffer = StringBuffer();
@@ -131,15 +238,24 @@ class RealtimeVoiceService {
       return false;
     }
 
-    final token = await _mintToken(
+    final session = await _openSession(
       user: user,
       scenarioTitle: scenarioTitle,
       deviceId: deviceId,
     );
-    if (token == null) return false;
+    if (session == null) return false;
+
+    _provider = session.provider;
+    _sampleRate = session.sampleRate;
 
     try {
-      await _connect(token.token, token.model);
+      await _connect(session);
+      // The agent needs to know who it is talking to before any audio arrives,
+      // so this goes first — the very next frame on the socket is microphone
+      // data.
+      if (session.provider == LiveProvider.elevenLabs) {
+        _sendAgentInitiation(user: user, scenarioTitle: scenarioTitle);
+      }
       await _startAudio();
       state.value = VoiceCallState.listening;
       return true;
@@ -156,13 +272,19 @@ class RealtimeVoiceService {
   /// Safe to call at any point, including twice — the screen calls it from
   /// dispose, and an in-flight failure may already have torn things down.
   Future<void> stop() async {
+    _speechTail?.cancel();
+    _speechTail = null;
+
     await _mic?.cancel();
     _mic = null;
 
-    try {
-      if (await _recorder.isRecording()) await _recorder.stop();
-    } catch (e) {
-      debugPrint('RealtimeVoiceService: recorder stop failed ($e)');
+    if (_audioStarted) {
+      _audioStarted = false;
+      try {
+        if (await _recorder.isRecording()) await _recorder.stop();
+      } catch (e) {
+        debugPrint('RealtimeVoiceService: recorder stop failed ($e)');
+      }
     }
 
     await _events?.cancel();
@@ -184,13 +306,27 @@ class RealtimeVoiceService {
       _pcmReady = false;
     }
 
+    // stop() runs past several await points, and dispose() starts it without
+    // waiting. By the time control returns here the notifiers may already be
+    // gone, and writing to a disposed one throws.
+    if (_disposed) return;
     amplitude.value = 0;
     if (state.value != VoiceCallState.failed) state.value = VoiceCallState.idle;
   }
 
+  /// Ends the exchange stream so a listener collecting it can complete.
+  @visibleForTesting
+  Future<void> closeExchanges() =>
+      _exchanges.isClosed ? Future.value() : _exchanges.close();
+
+  bool _disposed = false;
+
   void dispose() {
+    // Set before stopping, so the teardown running behind us knows not to
+    // touch the notifiers this method is about to dispose.
+    _disposed = true;
     unawaited(stop());
-    _exchanges.close();
+    if (!_exchanges.isClosed) unawaited(_exchanges.close());
     state.dispose();
     learnerTranscript.dispose();
     tutorTranscript.dispose();
@@ -200,7 +336,7 @@ class RealtimeVoiceService {
 
   // ── Setup ──────────────────────────────────────────────────────────────
 
-  Future<({String token, String model})?> _mintToken({
+  Future<LiveSession?> _openSession({
     required UserProfile user,
     required String scenarioTitle,
     required String deviceId,
@@ -241,13 +377,13 @@ class RealtimeVoiceService {
       }
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final token = data['token'] as String?;
-      final model = data['model'] as String?;
-      if (token == null || token.isEmpty || model == null || model.isEmpty) {
+      final session = LiveSession.parse(data);
+      if (session == null) {
+        debugPrint('RealtimeVoiceService: unusable session ${response.body}');
         _fail(VoiceCallError.unknown);
         return null;
       }
-      return (token: token, model: model);
+      return session;
     } on TimeoutException {
       _fail(VoiceCallError.network);
       return null;
@@ -258,14 +394,20 @@ class RealtimeVoiceService {
     }
   }
 
-  Future<void> _connect(String token, String model) async {
-    _socket = WebSocketChannel.connect(
-      Uri.parse('wss://api.openai.com/v1/realtime?model=$model'),
-      // The ephemeral credential travels as a subprotocol rather than a header,
-      // because the WebSocket handshake has no place for an Authorization
-      // header in most client stacks.
-      protocols: ['realtime', 'openai-insecure-api-key.$token'],
-    );
+  Future<void> _connect(LiveSession session) async {
+    _socket = switch (session.provider) {
+      // The signed URL carries its own authorisation in the query string, so
+      // there is nothing to add to the handshake.
+      LiveProvider.elevenLabs => WebSocketChannel.connect(Uri.parse(session.url!)),
+
+      // OpenAI's ephemeral credential travels as a subprotocol rather than a
+      // header, because the WebSocket handshake has no place for an
+      // Authorization header in most client stacks.
+      LiveProvider.openAi => WebSocketChannel.connect(
+          Uri.parse('wss://api.openai.com/v1/realtime?model=${session.model}'),
+          protocols: ['realtime', 'openai-insecure-api-key.${session.token}'],
+        ),
+    };
     await _socket!.ready.timeout(const Duration(seconds: 15));
 
     _events = _socket!.stream.listen(
@@ -281,12 +423,39 @@ class RealtimeVoiceService {
     );
   }
 
+  /// Tells the ElevenLabs agent who this learner is.
+  ///
+  /// The teaching prompt lives on the agent and refers to `{{level}}`,
+  /// `{{native_language}}` and `{{scenario}}`; these fill them in. One agent
+  /// therefore serves every learner — the alternative, an agent per learner,
+  /// would be unmanageable and would put the prompt out of reach of anyone
+  /// wanting to improve it.
+  void _sendAgentInitiation({
+    required UserProfile user,
+    required String scenarioTitle,
+  }) {
+    final native = LanguageCatalog.byCode(user.nativeLanguageCode);
+    _socket?.sink.add(
+      jsonEncode({
+        'type': 'conversation_initiation_client_data',
+        'dynamic_variables': {
+          'level': user.proficiency.name,
+          // The readable name, not the code: a prompt reading "their first
+          // language is te" teaches the model nothing.
+          'native_language': native.name,
+          'scenario': scenarioTitle,
+        },
+      }),
+    );
+  }
+
   Future<void> _startAudio() async {
     await FlutterPcmSound.setup(sampleRate: _sampleRate, channelCount: 1);
     _pcmReady = true;
+    _audioStarted = true;
 
     final stream = await _recorder.startStream(
-      const RecordConfig(
+      RecordConfig(
         encoder: AudioEncoder.pcm16bits,
         sampleRate: _sampleRate,
         numChannels: 1,
@@ -304,10 +473,14 @@ class RealtimeVoiceService {
         amplitude.value = _loudness(chunk);
         final socket = _socket;
         if (socket == null) return;
+        final audio = base64Encode(chunk);
         socket.sink.add(
-          jsonEncode({
-            'type': 'input_audio_buffer.append',
-            'audio': base64Encode(chunk),
+          jsonEncode(switch (_provider) {
+            LiveProvider.elevenLabs => {'user_audio_chunk': audio},
+            LiveProvider.openAi => {
+                'type': 'input_audio_buffer.append',
+                'audio': audio,
+              },
           }),
         );
       },
@@ -330,6 +503,95 @@ class RealtimeVoiceService {
       return;
     }
 
+    switch (_provider) {
+      case LiveProvider.elevenLabs:
+        _onAgentEvent(event);
+      case LiveProvider.openAi:
+        _onRealtimeEvent(event);
+    }
+  }
+
+  /// ElevenLabs Agents protocol.
+  ///
+  /// Coarser than OpenAI's: the agent reports a whole turn at a time rather
+  /// than streaming deltas of it, and it does not announce when it has
+  /// finished speaking — see [_speechTail].
+  @visibleForTesting
+  void handleAgentEvent(Map<String, dynamic> event) => _onAgentEvent(event);
+
+  void _onAgentEvent(Map<String, dynamic> event) {
+    Map<String, dynamic>? payload(String key) =>
+        event[key] as Map<String, dynamic>?;
+
+    switch (event['type'] as String? ?? '') {
+      case 'conversation_initiation_metadata':
+        return;
+
+      // The agent's voice. Each chunk restarts the tail timer, so the call
+      // returns to listening a beat after the last one arrives.
+      case 'audio':
+        if (_interrupted) return;
+        _play(payload('audio_event')?['audio_base_64'] as String?);
+        state.value = VoiceCallState.speaking;
+        _speechTail?.cancel();
+        _speechTail = Timer(_speechTailGap, () {
+          if (state.value == VoiceCallState.speaking) {
+            state.value = VoiceCallState.listening;
+          }
+        });
+        return;
+
+      // A whole turn of the learner's speech, already finalised.
+      case 'user_transcript':
+        final text =
+            payload('user_transcription_event')?['user_transcript'] as String?;
+        if (text == null || text.isEmpty) return;
+        _learnerBuffer
+          ..clear()
+          ..write(text);
+        learnerTranscript.value = text;
+        state.value = VoiceCallState.thinking;
+        return;
+
+      // A whole turn of the tutor's, arriving before its audio does.
+      case 'agent_response':
+        final text = payload('agent_response_event')?['agent_response'] as String?;
+        if (text == null || text.isEmpty) return;
+        _interrupted = false;
+        _tutorBuffer
+          ..clear()
+          ..write(text);
+        tutorTranscript.value = text;
+        _emitExchange();
+        return;
+
+      // The agent revising what it had said, after the learner cut in — the
+      // corrected text is what actually reached them, so it replaces the
+      // exchange we already recorded.
+      case 'agent_response_correction':
+        final text = payload('agent_response_correction_event')?['corrected_agent_response']
+            as String?;
+        if (text == null || text.isEmpty) return;
+        tutorTranscript.value = text;
+        return;
+
+      case 'interruption':
+        _suppressPlayback();
+        state.value = VoiceCallState.listening;
+        return;
+
+      // A keepalive. Failing to answer it drops the call after a minute or so.
+      case 'ping':
+        final id = payload('ping_event')?['event_id'];
+        _socket?.sink.add(jsonEncode({'type': 'pong', 'event_id': id}));
+        return;
+
+      default:
+        return;
+    }
+  }
+
+  void _onRealtimeEvent(Map<String, dynamic> event) {
     final type = event['type'] as String? ?? '';
 
     // Event names have moved between API revisions (`response.audio.delta`

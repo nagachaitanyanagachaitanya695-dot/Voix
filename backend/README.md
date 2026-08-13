@@ -1,12 +1,13 @@
 # Voix backend
 
-A single Cloudflare Worker that holds your OpenAI API key so the app never
-has to. It gives the tutor a real brain: it answers what the learner actually
-said, translates, and explains mistakes in their own language.
+A single Cloudflare Worker that holds your API keys so the app never has to. It
+gives the tutor a real brain: it answers what the learner actually said,
+translates, and explains mistakes in their own language. It also decides who is
+allowed a live call, and hands out the short-lived credentials for one.
 
-Speaking and listening stay on the phone — Android's own speech recogniser and
-text-to-speech — so no audio ever reaches this Worker and none of it costs
-anything.
+For everyone who has not paid, speaking and listening stay on the phone —
+Android's own speech recogniser and text-to-speech — so no audio reaches this
+Worker and none of it costs anything.
 
 **Why this exists:** an APK is a zip file. A key compiled into the app can be
 extracted in about thirty seconds by anyone who downloads it, and then they are
@@ -61,6 +62,46 @@ openssl rand -hex 24
 ```
 
 Keep that value — you paste it into the app in step 5.
+
+### 2b. The live call: pick a provider
+
+The live call — the one where the tutor talks back like a phone call — can run
+on either of two services. **You only need one.** The Worker picks ElevenLabs
+if you have configured it, and OpenAI otherwise, so switching later is two
+commands and no app update.
+
+**ElevenLabs Agents (recommended).** The agent handles turn-taking,
+interruption, speech recognition and the voice, and it holds the teaching
+prompt, so you can improve how the tutor teaches from a web page without
+touching any code.
+
+An agent has already been created in your workspace:
+
+| | |
+|---|---|
+| Name | Voix English Tutor |
+| Agent ID | `agent_2901kzwd5emsfg3ts393enmpb0we` |
+| Voice | 16 kHz, `eleven_flash_v2` |
+| Call length cap | 10 minutes |
+| Authentication | **on** — the agent ID alone is useless without a signed URL from this Worker |
+
+Set both of these:
+
+```bash
+npx wrangler secret put ELEVENLABS_API_KEY
+npx wrangler secret put ELEVENLABS_AGENT_ID   # agent_2901kzwd5emsfg3ts393enmpb0we
+```
+
+Get the API key from elevenlabs.io → your profile → API Keys. Same rule as
+every other key here: it goes into this command and nowhere else.
+
+**OpenAI Realtime.** Nothing extra to set — if `OPENAI_API_KEY` is present and
+ElevenLabs is not configured, the live call uses it. The teaching prompt then
+lives in `worker.js` rather than on an agent.
+
+You can also skip the live call entirely. Without either provider configured,
+`/v1/session` returns an error, the app keeps working, and practice happens
+through the phone's own recogniser at no cost.
 
 ### 3. Turn on the spending cap
 
@@ -151,23 +192,53 @@ a small model, not streaming audio. Even so:
 | Endpoint | Used by | What it does |
 | --- | --- | --- |
 | `POST /v1/chat` | Every tutor reply, and the end-of-session report | Returns the tutor's reply, corrections and scores as JSON |
+| `POST /v1/verify` | After a Play purchase | Asks Google whether the purchase is real, and records the entitlement |
+| `POST /v1/session` | Starting a live call | Returns credentials for one call — subscribers only |
 
-It requires the `x-voix-app-token` header and accepts an `x-voix-device`
+They require the `x-voix-app-token` header and accept an `x-voix-device`
 header, used for the daily cap.
+
+`/v1/session` answers with whichever provider is configured, and the app
+speaks that protocol:
+
+```jsonc
+// ElevenLabs
+{ "provider": "elevenlabs", "url": "wss://…signed…", "sampleRate": 16000 }
+
+// OpenAI
+{ "provider": "openai", "token": "ek_…", "model": "…", "sampleRate": 24000 }
+```
+
+It returns **402** for anyone this Worker has not verified as a subscriber.
+That check is the real paywall — the app's own is a courtesy, because an APK
+can be edited and this Worker cannot.
 
 ## Changing how the tutor teaches
 
-The teaching prompt is the `tutorInstructions()` function in `worker.js`. It is
-deliberately on the server: prompt wording is what you will tune most often, and
-here you can change it and `npx wrangler deploy` in seconds instead of shipping
-an app update and waiting for Play review.
+Where the teaching prompt lives depends on which provider carries the call:
+
+- **ElevenLabs** — on the agent, at
+  [elevenlabs.io](https://elevenlabs.io) → Agents → Voix English Tutor →
+  System prompt. Edit and save; the next call uses it. The prompt refers to
+  `{{level}}`, `{{native_language}}` and `{{scenario}}`, which the app fills in
+  per learner — keep those placeholders or the tutor stops adapting to who it
+  is talking to.
+- **OpenAI, and all text replies** — the `tutorInstructions()` function in
+  `worker.js`. Change it and `npx wrangler deploy`.
+
+Both are deliberately off the phone: prompt wording is what you will tune most
+often, and neither route needs an app update and a Play review to change.
 
 ## Honest status
 
-None of this has been run. It was written against OpenAI's published API
-documentation, but there was no OpenAI key and no way to call the API from
-where it was built. Expect to fix something on the first deploy — `npx wrangler
-tail` shows you exactly what OpenAI is complaining about.
+None of this has been run against a live API. It was written against the
+published documentation, with no keys available where it was built. Expect to
+fix something on the first deploy — `npx wrangler tail` shows you exactly what
+the upstream service is complaining about.
+
+The one part that *has* been verified is the ElevenLabs agent: it was created
+through the API, its configuration was read back, and authentication was
+confirmed on. What has not been verified is a real call flowing through it.
 
 If the app cannot reach this Worker for any reason, it falls back to the
 on-device tutor rather than showing an error. That is deliberate, but it also
