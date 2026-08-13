@@ -43,9 +43,27 @@ jobs:
       - name: Test
         run: flutter test
 
-      # No key.properties in CI, so the release build falls back to debug
-      # signing — installable on a phone, and rejected by Play, which is
-      # exactly what a test build should be.
+      # Sign with the committed throwaway key rather than letting Gradle fall
+      # back to a debug key.
+      #
+      # The runner has no ~/.android/debug.keystore, so Gradle generates one —
+      # a different one on every run. Android will not install an APK over an
+      # app signed with a different key: it says "App not installed" and gives
+      # no reason. That made every build after the first uninstallable without
+      # wiping the app and its progress first.
+      #
+      # This key cannot reach Play. The upload key lives in key.properties,
+      # which is gitignored and not present here, so a build made by CI is
+      # still rejected at upload — which is what a test build should be.
+      - name: Use the shared test signing key
+        run: |
+          cat > android/key.properties <<'PROPS'
+          storeFile=../test-signing.jks
+          storePassword=voixtest
+          keyAlias=voixtest
+          keyPassword=voixtest
+          PROPS
+
       #
       # VOIX_TESTING turns on the in-app testing screen, where the Worker's
       # address can be typed in. Without it a CI build has no backend at all —

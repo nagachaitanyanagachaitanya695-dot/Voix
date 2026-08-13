@@ -40,6 +40,14 @@ storeFile=/home/you/voix-upload-key.jks
 `android/.gitignore` already excludes `key.properties`, `*.jks` and
 `*.keystore`, so none of this can be committed by accident.
 
+> **`android/test-signing.jks` is the one exception**, and it is not yours. It
+> is a throwaway key that CI signs test builds with, so that each APK from a
+> build can be installed over the last one — Android refuses to update an app
+> whose signing key changed, which is what "App not installed" usually means.
+> Its password is in the workflow file. It is not an upload key and Play will
+> reject anything signed with it. Do not use it for a release, and do not
+> confuse it with the keystore you create above.
+
 `android/app/build.gradle.kts` reads the file if it exists and signs the release
 build with it. If the file is missing, the release build falls back to debug
 keys — useful for `flutter run --release`, and harmless, because Play rejects a

@@ -12,3 +12,15 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Exception: the throwaway key CI signs test builds with.
+#
+# It is committed on purpose. Without a fixed key, Gradle falls back to a debug
+# key that the build machine generates fresh every run, so every APK is signed
+# differently and Android refuses to install one over another — it just says
+# "App not installed" and does not explain why.
+#
+# This key is worthless to a thief: it is not the Play upload key, its password
+# is in the workflow file, and an APK signed with it cannot be published. Your
+# real key lives in key.properties, which stays ignored above.
+!test-signing.jks
