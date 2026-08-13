@@ -46,18 +46,31 @@ jobs:
       # No key.properties in CI, so the release build falls back to debug
       # signing — installable on a phone, and rejected by Play, which is
       # exactly what a test build should be.
-      # Split per ABI. A universal APK carries native code for arm64, arm32 and
-      # x86_64 at once and comes to ~64 MB, of which any given phone uses about
-      # a third. The arm64 slice is ~22 MB and is what every phone sold in the
-      # last several years actually runs.
-      - name: Build APKs
-        run: flutter build apk --release --split-per-abi
+      # Both shapes, because they are for different situations.
+      #
+      # The universal APK carries native code for every architecture at once
+      # (~64 MB). It is the one to reach for when you just want the app on a
+      # phone, because it cannot pick the wrong slice.
+      #
+      # The per-ABI APKs are a third of that. Worth having for a slow
+      # connection, and arm64-v8a covers essentially every phone sold in the
+      # last decade — but a wrong guess there is an app that will not install.
+      - name: Build universal APK
+        run: flutter build apk --release
 
       - name: Name the build
         id: name
         run: echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
-      - name: Rename APKs
+      - name: Set aside the universal APK
+        run: |
+          mv build/app/outputs/flutter-apk/app-release.apk \
+             "$GITHUB_WORKSPACE/voix-${{ steps.name.outputs.sha }}.apk"
+
+      - name: Build per-ABI APKs
+        run: flutter build apk --release --split-per-abi
+
+      - name: Rename per-ABI APKs
         run: |
           cd build/app/outputs/flutter-apk
           for abi in arm64-v8a armeabi-v7a x86_64; do
@@ -82,10 +95,14 @@ jobs:
           body: |
             Automatic test build of Voix.
 
-            **Which file:** take the `arm64-v8a` one. That is every Android
-            phone sold in roughly the last decade. Only reach for
-            `armeabi-v7a` if that one refuses to install, and `x86_64` is for
-            emulators.
+            **Which file:** take `voix-<commit>.apk` — the one with no
+            architecture in its name. It works on every phone. It is larger
+            because it contains the code for all of them.
+
+            The `-arm64-v8a` / `-armeabi-v7a` / `-x86_64` files are the same
+            app cut down to one architecture, about a third of the size. Only
+            worth it on a slow connection, and only if you know which one your
+            phone is — the wrong one will not install.
 
             **Install:** download it on your phone and open it. Android will
             warn about installing from an unknown source — allow it for your
