@@ -22,11 +22,15 @@
         android:label="Voix"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- No android:taskAffinity override here. An empty affinity puts the
+             activity in a task unrelated to the package, which some launchers —
+             MIUI in particular — then cannot match to the icon they are
+             animating from. The open animation starts from the wrong bounds and
+             can stall part-way, leaving a half-drawn, unfocused window. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
