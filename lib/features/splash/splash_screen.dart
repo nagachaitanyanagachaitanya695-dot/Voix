@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -48,6 +50,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   Animation<double> _curve(double begin, double end, Curve curve) =>
       CurvedAnimation(parent: _c, curve: Interval(begin, end, curve: curve));
 
+  /// Stops the handover running twice — the status listener and the safety
+  /// timer can both reach it.
+  bool _advanced = false;
+
+  /// Fires if the animation never reports completion.
+  ///
+  /// The controller only tells us it finished while it is ticking, and a
+  /// ticker is muted whenever the app is not visible: launching, then
+  /// switching away before the sequence ends, leaves the splash on screen for
+  /// good. An opening animation must never be the thing that traps someone in
+  /// the app's first three seconds.
+  Timer? _failsafe;
+
   @override
   void initState() {
     super.initState();
@@ -55,16 +70,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     _c.addStatusListener((status) {
       if (status == AnimationStatus.completed) _advance();
     });
+    _failsafe = Timer(Motion.splash + const Duration(seconds: 1), _advance);
   }
 
   @override
   void dispose() {
+    _failsafe?.cancel();
     _c.dispose();
     super.dispose();
   }
 
   void _advance() {
-    if (!mounted) return;
+    if (_advanced || !mounted) return;
+    _advanced = true;
+    _failsafe?.cancel();
 
     final onboarded = ref.read(onboardingControllerProvider);
     final signedIn = ref.read(userControllerProvider) != null;
@@ -80,19 +99,18 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 620),
+        // Short, and a plain cross-fade with no scale.
+        //
+        // A route ignores taps until its transition finishes, so every
+        // millisecond here is time the app looks present but answers nothing.
+        // The old 620ms scale-and-fade was long enough that a stalled frame
+        // during it is indistinguishable from a hung app.
+        transitionDuration: const Duration(milliseconds: 260),
         pageBuilder: (_, __, ___) => next,
-        transitionsBuilder: (_, animation, __, child) {
-          final curved =
-              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
-          return FadeTransition(
-            opacity: curved,
-            child: ScaleTransition(
-              scale: Tween(begin: 1.06, end: 1.0).animate(curved),
-              child: child,
-            ),
-          );
-        },
+        transitionsBuilder: (_, animation, __, child) => FadeTransition(
+          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+          child: child,
+        ),
       ),
     );
   }
