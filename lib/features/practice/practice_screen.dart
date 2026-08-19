@@ -16,6 +16,8 @@ import '../../data/models/user_profile.dart';
 import '../../providers/session_controller.dart';
 import '../../providers/user_controller.dart';
 import '../learn/learn_page.dart';
+import '../learn/word_sheet.dart';
+import '../songs/songs_screen.dart';
 import '../onboarding/widgets/option_tile.dart';
 import '../profile/premium_screen.dart';
 import '../profile/settings_screen.dart';
@@ -357,6 +359,38 @@ class PracticeScreen extends ConsumerWidget {
                                 builder: (_) => const SettingsScreen(),
                               ),
                             ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Gap.h12,
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: _FeatureTile(
+                            icon: Icons.music_note_rounded,
+                            gradient: VoixGradients.violetMagenta,
+                            title: 'Sing a Song',
+                            caption:
+                                'Learn any song line by line, and be heard',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const SongsScreen(),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Gap.w12,
+                        Expanded(
+                          child: _FeatureTile(
+                            icon: Icons.search_rounded,
+                            gradient: VoixGradients.gold,
+                            title: 'Word Help',
+                            caption: 'Meaning, forms, history & examples',
+                            onTap: () => showWordPrompt(context),
                           ),
                         ),
                       ],

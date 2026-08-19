@@ -10,6 +10,7 @@
  *   POST /v1/verify  → checks a Play purchase token with Google, grants premium
  *   POST /v1/session → credentials for a live voice call, subscribers only
  *   POST /v1/word    → everything about one word: meaning, forms, history
+ *   POST /v1/transcribe → a song's lyrics, with the moment each word is sung
  *
  * For everyone, speech is handled by the phone itself — Android's own
  * recogniser turns it into text and its text-to-speech reads the reply back.
@@ -74,6 +75,8 @@ export default {
           return await liveSession(request, env, origin);
         case '/v1/word':
           return await explainWord(request, env, origin);
+        case '/v1/transcribe':
+          return await transcribeSong(request, env, origin);
         default:
           return json({ error: 'Unknown endpoint.' }, 404, origin);
       }
@@ -311,6 +314,77 @@ async function chat(request, env, origin) {
 }
 
 /**
+ * Turns an uploaded song into lyrics with a timestamp on every word.
+ *
+ * ElevenLabs Scribe rather than a plain transcriber, because word-level timing
+ * is the whole point: without it the app can show lyrics but cannot highlight
+ * the line being sung, and the feature is a text file rather than practice.
+ *
+ * The audio arrives as raw bytes and is streamed straight through. It is never
+ * stored — the file stays on the learner's phone, and this Worker only sees it
+ * for the length of the request.
+ */
+async function transcribeSong(request, env, origin) {
+  if (!env.ELEVENLABS_API_KEY) {
+    return json(
+      { error: 'Automatic lyrics need ELEVENLABS_API_KEY.', code: 'not_configured' },
+      503,
+      origin,
+    );
+  }
+
+  const audio = await request.arrayBuffer();
+  if (!audio || audio.byteLength === 0) {
+    return json({ error: 'No audio received.' }, 400, origin);
+  }
+  // A guard, not a policy: a song is a few megabytes and anything far past
+  // that is a mistake or an attempt to run up the bill.
+  if (audio.byteLength > MAX_SONG_BYTES) {
+    return json(
+      { error: 'That file is too large. Songs up to 20 MB work best.' },
+      413,
+      origin,
+    );
+  }
+
+  const type = request.headers.get('x-voix-audio-type') || 'audio/mpeg';
+  const form = new FormData();
+  form.append('file', new Blob([audio], { type }), 'song');
+  form.append('model_id', 'scribe_v1');
+  // Diarisation off: a song has one singer as far as this is concerned, and
+  // turning it on both costs more and splits lines on backing vocals.
+  form.append('diarize', 'false');
+  form.append('timestamps_granularity', 'word');
+
+  const response = await fetch(`${ELEVENLABS}/speech-to-text`, {
+    method: 'POST',
+    headers: { 'xi-api-key': env.ELEVENLABS_API_KEY },
+    body: form,
+  });
+
+  if (!response.ok) {
+    console.error('scribe failed', response.status, await response.text());
+    return json({ error: 'Could not read the lyrics from that file.' }, 502, origin);
+  }
+
+  const data = await response.json();
+
+  // Scribe returns spacing and punctuation as their own entries; the app wants
+  // only the words, with seconds converted to milliseconds.
+  const words = (data.words ?? [])
+    .filter((w) => (w.type ?? 'word') === 'word' && String(w.text ?? '').trim())
+    .map((w) => ({
+      t: String(w.text).trim(),
+      s: Math.round((w.start ?? 0) * 1000),
+      e: Math.round((w.end ?? w.start ?? 0) * 1000),
+    }));
+
+  return json({ words, text: data.text ?? '' }, 200, origin);
+}
+
+const MAX_SONG_BYTES = 20 * 1024 * 1024;
+
+/**
  * Explains a single word.
  *
  * Free for everyone, deliberately. Looking up a word is the moment a learner
@@ -477,21 +551,24 @@ async function checkBudget(env, deviceId, pathname) {
   if (pathname === '/v1/verify') return { ok: true };
   if (!env.VOIX_KV) return { ok: true };
 
-  // Live voice is billed per minute of audio, so it gets its own, much
-  // tighter cap than text.
-  const isVoice = pathname === '/v1/session';
+  // Audio is billed by the minute and text by the token, so they get separate
+  // and very different caps. Importing a song is the most expensive single
+  // request the app can make — a whole file, transcribed — so it is metered
+  // with live voice rather than with chat.
+  const audioPaths = ['/v1/session', '/v1/transcribe'];
+  const isAudio = audioPaths.includes(pathname);
   const limit = Number(
-    isVoice ? env.DAILY_VOICE_LIMIT ?? 12 : env.DAILY_CHAT_LIMIT ?? 300,
+    isAudio ? env.DAILY_VOICE_LIMIT ?? 12 : env.DAILY_CHAT_LIMIT ?? 300,
   );
   const day = new Date().toISOString().slice(0, 10);
-  const key = `${isVoice ? 'v' : 'c'}:${day}:${deviceId}`;
+  const key = `${isAudio ? 'v' : 'c'}:${day}:${deviceId}`;
 
   const used = Number((await env.VOIX_KV.get(key)) ?? 0);
   if (used >= limit) {
     return {
       ok: false,
-      message: isVoice
-        ? 'You have reached today\'s limit for live voice practice. It resets tomorrow.'
+      message: isAudio
+        ? 'You have reached today\'s limit for voice practice and song imports. It resets tomorrow.'
         : 'You have reached today\'s practice limit. It resets tomorrow.',
     };
   }

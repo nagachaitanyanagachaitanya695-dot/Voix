@@ -46,7 +46,10 @@ class LyricLine {
   Map<String, dynamic> toJson() => {'w': words.map((w) => w.toJson()).toList()};
 
   static LyricLine fromJson(Map<String, dynamic> j) => LyricLine(
-        ((j['w'] as List?) ?? const [])
+        // `is List` rather than a cast: storage can be interrupted mid-write,
+        // and a half-written entry must not take the whole library down with
+        // it on the next launch.
+        (j['w'] is List ? j['w'] as List : const [])
             .whereType<Map<String, dynamic>>()
             .map(LyricWord.fromJson)
             .toList(),
@@ -177,7 +180,7 @@ class Song {
         artist: j['artist'] as String? ?? '',
         filePath: j['filePath'] as String? ?? '',
         durationMs: (j['durationMs'] as num?)?.toInt() ?? 0,
-        lines: ((j['lines'] as List?) ?? const [])
+        lines: (j['lines'] is List ? j['lines'] as List : const [])
             .whereType<Map<String, dynamic>>()
             .map(LyricLine.fromJson)
             .toList(),

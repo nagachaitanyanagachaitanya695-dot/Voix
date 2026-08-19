@@ -94,4 +94,7 @@ abstract final class BackendConfig {
 
   /// Explaining a single word: meaning, history, examples, translation.
   static Uri get wordUrl => Uri.parse('$baseUrl/v1/word');
+
+  /// Reading a song's lyrics, with the moment each word is sung.
+  static Uri get transcribeUrl => Uri.parse('$baseUrl/v1/transcribe');
 }

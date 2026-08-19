@@ -379,3 +379,43 @@ class _SenseCard extends StatelessWidget {
     );
   }
 }
+
+/// Asks which word, then explains it.
+///
+/// The entry point for "I have a doubt about a word" when there is no word on
+/// screen to tap — from the Practice grid, or any other standing start.
+Future<void> showWordPrompt(BuildContext context) async {
+  final controller = TextEditingController();
+  final word = await showDialog<String>(
+    context: context,
+    builder: (context) {
+      void submit() {
+        final text = controller.text.trim();
+        if (text.isNotEmpty) Navigator.of(context).pop(text);
+      }
+
+      return AlertDialog(
+        title: const Text('Which word?'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          autocorrect: false,
+          textInputAction: TextInputAction.search,
+          onSubmitted: (_) => submit(),
+          decoration: const InputDecoration(hintText: 'e.g. comfortable'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(onPressed: submit, child: const Text('Explain')),
+        ],
+      );
+    },
+  );
+  controller.dispose();
+
+  if (word == null || !context.mounted) return;
+  await showWordSheet(context, word);
+}

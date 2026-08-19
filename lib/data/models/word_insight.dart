@@ -28,7 +28,7 @@ class WordSense {
   static WordSense fromJson(Map<String, dynamic> j) => WordSense(
         partOfSpeech: (j['partOfSpeech'] as String? ?? '').trim(),
         definition: (j['definition'] as String? ?? '').trim(),
-        examples: ((j['examples'] as List?) ?? const [])
+        examples: (j['examples'] is List ? j['examples'] as List : const [])
             .whereType<String>()
             .map((e) => e.trim())
             .where((e) => e.isNotEmpty)
@@ -111,20 +111,20 @@ class WordInsight {
   static WordInsight fromJson(Map<String, dynamic> j, {bool complete = true}) =>
       WordInsight(
         word: (j['word'] as String? ?? '').trim(),
-        senses: ((j['senses'] as List?) ?? const [])
+        senses: (j['senses'] is List ? j['senses'] as List : const [])
             .whereType<Map<String, dynamic>>()
             .map(WordSense.fromJson)
             .where((s) => s.definition.isNotEmpty)
             .toList(),
         forms: {
-          for (final e in ((j['forms'] as Map?) ?? const {}).entries)
+          for (final e in (j['forms'] is Map ? j['forms'] as Map : const {}).entries)
             if (e.key is String && e.value is String && (e.value as String).isNotEmpty)
               e.key as String: e.value as String,
         },
         pronunciation: (j['pronunciation'] as String? ?? '').trim(),
         origin: (j['origin'] as String? ?? '').trim(),
         nativeMeaning: (j['nativeMeaning'] as String? ?? '').trim(),
-        synonyms: ((j['synonyms'] as List?) ?? const [])
+        synonyms: (j['synonyms'] is List ? j['synonyms'] as List : const [])
             .whereType<String>()
             .map((s) => s.trim())
             .where((s) => s.isNotEmpty)

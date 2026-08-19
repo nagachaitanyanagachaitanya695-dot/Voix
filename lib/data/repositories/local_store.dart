@@ -24,6 +24,10 @@ class LocalStore {
   static const kSignedIn = 'voix.signedIn';
   static const kSavedPhrases = 'voix.savedPhrases';
 
+  /// Imported songs, with their lyrics and timings. The audio itself is not
+  /// stored — only where the learner's file lives.
+  static const kSongs = 'voix.songs';
+
   /// A random per-install id, used only for the backend's daily spending cap.
   /// Not a hardware identifier — see `deviceIdProvider`.
   static const kDeviceId = 'voix.deviceId';
