@@ -55,6 +55,22 @@ android {
                 keyPassword = keystoreProperties["keyPassword"] as String
                 storeFile = file(keystoreProperties["storeFile"] as String)
                 storePassword = keystoreProperties["storePassword"] as String
+
+                // All three schemes, explicitly.
+                //
+                // AGP turns v1 off by default once minSdk is 24, on the
+                // grounds that v2 is enough from Android 7 onwards. That is
+                // true of stock Android and not true of every OEM: MIUI's
+                // package installer refuses a v2-only APK and reports it as a
+                // bare "App not installed." with no reason given, which is
+                // indistinguishable from a signature conflict or a corrupt
+                // download.
+                //
+                // v1 costs a little size and nothing else, so there is no
+                // reason to make a phone prove it can do without it.
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
             }
         }
     }
