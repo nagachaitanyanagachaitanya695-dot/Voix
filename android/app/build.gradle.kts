@@ -37,8 +37,26 @@ android {
         jvmTarget = JavaVersion.VERSION_11.toString()
     }
 
+    // A test build installs as its own app.
+    //
+    // Sharing an application id with the real app means sharing everything
+    // Android keys off it: the package record, the custom permissions AndroidX
+    // declares under it, and the signature that owns them. A half-removed
+    // earlier install — MIUI's Dual Apps and Second Space both leave one — then
+    // blocks every future install with a bare "App not installed." and no
+    // reason given, and no amount of uninstalling from the launcher clears it.
+    //
+    // Set by CI. A release built locally has no suffix and is untouched.
+    val isTestBuild = project.findProperty("voixTestBuild") == "true"
+
     defaultConfig {
         applicationId = "com.voix.voix"
+        if (isTestBuild) {
+            applicationIdSuffix = ".test"
+            resValue("string", "app_label", "Voix (Test)")
+        } else {
+            resValue("string", "app_label", "Voix")
+        }
         // Pinned rather than inherited: firebase_auth requires 23, and pinning
         // stops a Flutter upgrade from silently moving the floor under a
         // release that has already shipped to users.

@@ -64,6 +64,18 @@ jobs:
           keyPassword=voixtest
           PROPS
 
+      # Build it as a separate app: applicationId com.voix.voix.test, labelled
+      # "Voix (Test)".
+      #
+      # Everything Android refuses an install over is keyed on the application
+      # id — the package record, the signature that owns it, and the custom
+      # permissions AndroidX declares beneath it. A half-removed earlier
+      # install holds all three, and MIUI's Dual Apps and Second Space both
+      # leave one behind that uninstalling from the launcher does not clear.
+      # A test build under its own id cannot collide with any of that.
+      - name: Mark this as a test build
+        run: echo "voixTestBuild=true" >> android/gradle.properties
+
       #
       # VOIX_TESTING turns on the in-app testing screen, where the Worker's
       # address can be typed in. Without it a CI build has no backend at all —

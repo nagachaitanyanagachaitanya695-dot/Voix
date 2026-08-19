@@ -19,7 +19,7 @@
          with typed input, so devices without one can still install it. -->
     <uses-feature android:name="android.hardware.microphone" android:required="false"/>
     <application
-        android:label="Voix"
+        android:label="@string/app_label"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <!-- No android:taskAffinity override here. An empty affinity puts the
