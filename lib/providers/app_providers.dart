@@ -16,6 +16,7 @@ import '../data/services/notification_service.dart';
 import '../data/services/realtime_voice_service.dart';
 import '../data/services/remote_ai_tutor_service.dart';
 import '../data/services/speech_service.dart';
+import '../data/services/word_service.dart';
 import '../data/services/subscription_service.dart';
 
 /// Injected in `main()` once [LocalStore.open] resolves, so the rest of the
@@ -106,6 +107,14 @@ final subscriptionServiceProvider = Provider<SubscriptionService>((ref) {
 final notificationServiceProvider = Provider<NotificationService>(
   (ref) => NotificationService(),
 );
+
+/// Explains a single word. Cheap to build and holds an HTTP client, so it is
+/// kept for the life of the app rather than rebuilt per sheet.
+final wordServiceProvider = Provider<WordService>((ref) {
+  final service = WordService();
+  ref.onDispose(service.dispose);
+  return service;
+});
 
 final speechServiceProvider = Provider<SpeechService>((ref) {
   final service = SpeechService();

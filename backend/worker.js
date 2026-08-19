@@ -9,6 +9,7 @@
  *   POST /v1/chat    → the tutor's reply, corrections and end-of-session scores
  *   POST /v1/verify  → checks a Play purchase token with Google, grants premium
  *   POST /v1/session → credentials for a live voice call, subscribers only
+ *   POST /v1/word    → everything about one word: meaning, forms, history
  *
  * For everyone, speech is handled by the phone itself — Android's own
  * recogniser turns it into text and its text-to-speech reads the reply back.
@@ -71,6 +72,8 @@ export default {
           return await verifyPurchase(request, env, origin);
         case '/v1/session':
           return await liveSession(request, env, origin);
+        case '/v1/word':
+          return await explainWord(request, env, origin);
         default:
           return json({ error: 'Unknown endpoint.' }, 404, origin);
       }
@@ -305,6 +308,95 @@ async function chat(request, env, origin) {
 
   const data = await response.json();
   return json({ content: data.choices?.[0]?.message?.content ?? '' }, 200, origin);
+}
+
+/**
+ * Explains a single word.
+ *
+ * Free for everyone, deliberately. Looking up a word is the moment a learner
+ * is most likely to give up on a sentence, and putting that behind a paywall
+ * would make the app worse at the thing it exists for. It is also cheap: one
+ * short reply from a small model, capped below.
+ *
+ * The app already derives the inflected forms on the phone, so this is asked
+ * only for what rules cannot produce.
+ */
+async function explainWord(request, env, origin) {
+  if (!env.OPENAI_API_KEY) {
+    return json({ error: 'Word help is unavailable right now.' }, 503, origin);
+  }
+
+  const body = await safeJson(request);
+  const word = String(body.word ?? '').trim().slice(0, 60);
+  if (!word) return json({ error: 'No word given.' }, 400, origin);
+
+  const level = ['beginner', 'intermediate', 'advanced'].includes(body.level)
+    ? body.level
+    : 'beginner';
+  const native = String(body.nativeLanguage ?? 'Telugu').slice(0, 40);
+
+  const response = await fetch(`${OPENAI}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: env.CHAT_MODEL,
+      messages: [
+        { role: 'system', content: wordInstructions(level, native) },
+        { role: 'user', content: word },
+      ],
+      max_completion_tokens: 700,
+      response_format: { type: 'json_object' },
+    }),
+  });
+
+  if (!response.ok) {
+    console.error('word failed', response.status, await response.text());
+    return json({ error: 'Could not explain that word.' }, 502, origin);
+  }
+
+  const data = await response.json();
+  return json({ content: data.choices?.[0]?.message?.content ?? '' }, 200, origin);
+}
+
+function wordInstructions(level, native) {
+  return [
+    `You explain single English words to a ${level} learner whose first`,
+    `language is ${native}.`,
+    ``,
+    `Reply with JSON only, in exactly this shape:`,
+    `{`,
+    `  "word": string,`,
+    `  "pronunciation": string,`,
+    `  "senses": [{ "partOfSpeech": string, "definition": string,`,
+    `               "examples": [string, string] }],`,
+    `  "origin": string,`,
+    `  "nativeMeaning": string,`,
+    `  "synonyms": [string]`,
+    `}`,
+    ``,
+    `Rules:`,
+    `- "pronunciation" is a plain respelling a ${native} speaker can read`,
+    `  aloud, like "KOM-fer-tuh-bul". Never IPA — a learner who cannot read`,
+    `  IPA is not helped by it.`,
+    `- Give every common sense of the word, not only the first. A word with`,
+    `  two lives — "book" the object and "book" the act of reserving — is`,
+    `  exactly the word someone is asking about.`,
+    `- Definitions in words a ${level} learner already knows. Explaining a`,
+    `  hard word with three harder ones is the most common way to fail here.`,
+    `- Examples must be ordinary sentences someone would really say, and`,
+    `  short enough to remember.`,
+    `- "origin" is one or two sentences of real etymology, in plain language.`,
+    `  Where the word came from is what makes a strange spelling finally make`,
+    `  sense, so include the older form and the language it came from.`,
+    `- "nativeMeaning" is the word in ${native}, in that language's own`,
+    `  script.`,
+    `- If the word is misspelled, answer for the word you believe was meant`,
+    `  and say so in the first definition.`,
+    `- Do not include inflected forms; the app derives those itself.`,
+  ].join('\n');
 }
 
 /**

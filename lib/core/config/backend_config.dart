@@ -91,4 +91,7 @@ abstract final class BackendConfig {
 
   /// Where a Play purchase token is sent to be checked against Google.
   static Uri get verifyUrl => Uri.parse('$baseUrl/v1/verify');
+
+  /// Explaining a single word: meaning, history, examples, translation.
+  static Uri get wordUrl => Uri.parse('$baseUrl/v1/word');
 }
