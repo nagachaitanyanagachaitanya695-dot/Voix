@@ -266,6 +266,9 @@ class _TestingScreenState extends ConsumerState<TestingScreen> {
                     ),
                     Gap.h24,
 
+                    _DeviceReport(),
+                    Gap.h24,
+
                     SettingsGroup(
                       title: 'This build',
                       tiles: [
@@ -318,4 +321,83 @@ class _Label extends StatelessWidget {
           color: context.colors.textSecondary,
         ),
       );
+}
+
+/// What this phone reports about itself.
+///
+/// Layout bugs that only happen on one device are almost always a number the
+/// system gave us that no emulator ever produces — a bottom inset half the
+/// height of the screen, a text scale nobody tests at. Guessing at those from
+/// a screenshot wastes a build cycle each time; reading them takes one.
+class _DeviceReport extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    final c = context.colors;
+
+    String px(EdgeInsets e) =>
+        'L${e.left.round()} T${e.top.round()} R${e.right.round()} B${e.bottom.round()}';
+
+    final rows = <(String, String)>[
+      ('Screen', '${mq.size.width.round()} × ${mq.size.height.round()} dp'),
+      ('Pixel ratio', mq.devicePixelRatio.toStringAsFixed(2)),
+      ('Padding', px(mq.padding)),
+      ('View padding', px(mq.viewPadding)),
+      ('View insets', px(mq.viewInsets)),
+      ('Text scale', mq.textScaler.scale(1).toStringAsFixed(2)),
+      ('Orientation', mq.orientation.name),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SettingsGroup(title: 'This device', tiles: const []),
+        Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: Gap.md,
+            vertical: Gap.sm,
+          ),
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(Radii.md),
+            border: Border.all(color: c.border),
+          ),
+          child: Column(
+            children: [
+              for (final (label, value) in rows)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 108,
+                        child: Text(
+                          label,
+                          style: TextStyle(fontSize: 13, color: c.textTertiary),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          value,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: c.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+        Gap.h8,
+        Text(
+          'Send a photo of this if anything looks wrong on screen.',
+          style: TextStyle(fontSize: 12, color: c.textTertiary),
+        ),
+      ],
+    );
+  }
 }

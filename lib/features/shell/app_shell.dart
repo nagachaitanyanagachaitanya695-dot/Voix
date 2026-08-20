@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -83,6 +85,13 @@ class _NavItem {
 @visibleForTesting
 const navBarPaddingKey = Key('voix.navbar.padding');
 
+/// The largest bottom inset worth honouring. Three-button navigation is 48dp
+/// and a gesture pill less; anything beyond this is a device reporting
+/// nonsense, not a bar that needs clearing.
+@visibleForTesting
+const double maxSystemInset = 64;
+const double _maxSystemInset = maxSystemInset;
+
 class _VoixNavBar extends StatelessWidget {
   const _VoixNavBar({required this.index, required this.onSelect});
 
@@ -108,11 +117,17 @@ class _VoixNavBar extends StatelessWidget {
       // gesture area rather than above it. The inset has to be added in full:
       // a fixed token was leaving the bottom of every icon and label sitting
       // underneath the gesture pill.
+      //
+      // Clamped, though. This padding sits below the bar, so whatever the
+      // system reports is exactly how far up the screen the bar floats — and a
+      // device that reports a nonsense inset puts the whole navigation in the
+      // middle of the page. No Android navigation area is anywhere near 64dp,
+      // so a larger figure is wrong by definition and is not worth honouring.
       padding: EdgeInsets.fromLTRB(
         Gap.sm,
         0,
         Gap.sm,
-        context.safeArea.bottom + Gap.sm,
+        math.min(context.safeArea.bottom, _maxSystemInset) + Gap.sm,
       ),
       child: Container(
         // A floor, not a fixed height: the labels grow with the system text

@@ -42,6 +42,20 @@ class _FadeSlideInState extends State<FadeSlideIn>
   /// would keep firing after the widget is gone.
   Timer? _startTimer;
 
+  /// Shows the content outright if the animation never runs.
+  ///
+  /// `forward()` only advances while the widget's ticker is ticking, and a
+  /// ticker is muted whenever its subtree is not animating — an offstage
+  /// route, a paused page, some device states. When that happens the
+  /// controller sits at zero and every widget wrapped in this stays at low
+  /// opacity: a page that reads as dim and broken while remaining fully
+  /// interactive underneath.
+  ///
+  /// Setting `value` directly needs no ticker, so this cannot be defeated the
+  /// same way. An entrance animation is decoration; the content is not, and it
+  /// must never be what hides it.
+  Timer? _failsafe;
+
   @override
   void initState() {
     super.initState();
@@ -53,11 +67,17 @@ class _FadeSlideInState extends State<FadeSlideIn>
         if (mounted) _c.forward();
       });
     }
+    _failsafe = Timer(wait + widget.duration + _failsafeGrace, () {
+      if (mounted && _c.value < 1.0) _c.value = 1.0;
+    });
   }
+
+  static const _failsafeGrace = Duration(milliseconds: 600);
 
   @override
   void dispose() {
     _startTimer?.cancel();
+    _failsafe?.cancel();
     _c.dispose();
     super.dispose();
   }
