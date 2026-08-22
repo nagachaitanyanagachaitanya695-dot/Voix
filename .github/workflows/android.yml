@@ -90,7 +90,10 @@ jobs:
       # broken package. A single universal APK cannot be picked wrongly, and
       # for a test build that is worth more than the megabytes.
       - name: Build the APK
-        run: flutter build apk --release --dart-define=VOIX_TESTING=true
+        run: |
+          flutter build apk --release \
+            --dart-define=VOIX_TESTING=true \
+            --dart-define=VOIX_BUILD=${GITHUB_SHA::7}
 
       - name: Name the build
         id: name

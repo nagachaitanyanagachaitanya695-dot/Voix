@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/config/backend_config.dart';
+import '../../core/config/build_info.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/utils/context_ext.dart';
@@ -237,7 +238,10 @@ class SettingsScreen extends ConsumerWidget {
             const VoixWordmark(markSize: 48, fontSize: 30),
             Gap.h16,
             Text(
-              'Version 1.0.0 (1)',
+              // The build is here and not only on the testing screen, because
+              // a store release has no testing screen and "which build is
+              // that?" is the first question about any bug report.
+              'Version 1.0.0 (1) · build ${BuildInfo.commit}',
               style: context.text.labelMedium,
             ),
             Gap.h12,

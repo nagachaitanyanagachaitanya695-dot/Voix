@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/config/backend_config.dart';
+import '../../core/config/build_info.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/utils/context_ext.dart';
@@ -165,7 +166,17 @@ class _TestingScreenState extends ConsumerState<TestingScreen> {
                           'paid features. Not present in a store release.',
                       color: VoixPalette.cyan,
                     ),
-                    Gap.h24,
+                    Gap.h12,
+                    Text(
+                      'Build ${BuildInfo.commit}',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: c.textSecondary,
+                      ),
+                    ),
+                    Gap.h20,
 
                     _Label('Backend address'),
                     Gap.h8,
