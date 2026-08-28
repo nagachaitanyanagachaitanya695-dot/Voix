@@ -20,8 +20,10 @@ import 'package:voix/features/learn/learn_screen.dart';
 import 'package:voix/features/onboarding/onboarding_flow.dart';
 import 'package:voix/features/practice/practice_screen.dart';
 import 'package:voix/features/profile/profile_screen.dart';
+import 'package:voix/features/profile/testing_screen.dart';
 import 'package:voix/features/progress/progress_screen.dart';
 import 'package:voix/features/shell/app_shell.dart';
+import 'package:voix/features/songs/songs_screen.dart';
 import 'package:voix/providers/app_providers.dart';
 
 /// Renders each screen to a PNG so the UI can be reviewed without a device.
@@ -74,6 +76,10 @@ void main() {
       _shot('06_progress', theme, (_) => const ProgressScreen());
       _shot('07_profile', theme, (_) => const ProfileScreen());
       _shot('08_shell', theme, (_) => const AppShell(), scaffold: false);
+      // Added later; rendered here so the new screens get the same
+      // without-a-device review as the rest.
+      _shot('09_songs', theme, (_) => const SongsScreen(), scaffold: false);
+      _shot('10_testing', theme, (_) => const TestingScreen(), scaffold: false);
     });
   }
 }
