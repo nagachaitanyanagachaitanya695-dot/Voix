@@ -2,34 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:voix/core/theme/app_dimens.dart';
 import 'package:voix/core/widgets/staggered.dart';
-import 'package:voix/features/shell/app_shell.dart';
 
-/// Two failures seen on a real phone, both of which left the app looking
-/// broken while it was in fact working: navigation floating in the middle of
-/// the screen, and page content stuck half-faded.
+/// An entrance animation must never be the thing hiding the content.
+///
+/// The nav bar's geometry is covered in navbar_position_test.dart, which
+/// measures what was actually rendered. The clamp tests that used to live here
+/// asserted Dart's own clamp() and would have passed with the app completely
+/// broken, which is exactly what happened.
 void main() {
-  group('nav bar inset', () {
-    testWidgets('honours an ordinary system inset', (tester) async {
-      await tester.pumpWidget(
-        const MediaQuery(
-          data: MediaQueryData(padding: EdgeInsets.only(bottom: 48)),
-          child: MaterialApp(home: SizedBox()),
-        ),
-      );
-      // The clamp must not interfere with a normal three-button bar.
-      expect(48.0.clamp(0.0, maxSystemInset), 48.0);
-    });
-
-    test('refuses a nonsense inset', () {
-      // The padding sits below the bar, so the reported inset is exactly how
-      // far up the screen the bar floats. A phone claiming 460 puts the whole
-      // navigation halfway up the page.
-      expect(460.0.clamp(0.0, maxSystemInset), maxSystemInset);
-      expect(maxSystemInset, lessThan(100),
-          reason: 'no Android navigation area is anywhere near this');
-    });
-  });
-
   group('entrance animations', () {
     testWidgets('reveal content normally', (tester) async {
       await tester.pumpWidget(

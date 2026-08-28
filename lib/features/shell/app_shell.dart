@@ -192,7 +192,16 @@ class _NavButton extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
+        // heightFactor sizes this to its child instead of filling.
+        //
+        // A bare Center expands to whatever it is offered, and Scaffold offers
+        // the bottom slot the entire screen. The bar grew to fill it, centred
+        // its icons — which is why navigation appeared halfway up the page —
+        // and, because extendBody draws the bar over the body, its
+        // near-opaque background covered the whole screen and made every page
+        // look faded. One widget, both faults.
         child: Center(
+          heightFactor: 1,
           child: AnimatedContainer(
             duration: Motion.base,
             curve: Motion.enter,

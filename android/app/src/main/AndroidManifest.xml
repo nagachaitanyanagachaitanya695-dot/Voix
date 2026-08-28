@@ -64,20 +64,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- Render with Skia rather than Impeller.
-             Impeller is Flutter's default renderer on Android from 3.29, and
-             on several Adreno parts — the ones in mid-range Xiaomi phones
-             among them — it mis-composites layers: whole pages draw dark or
-             stale while a single actively-animating layer stays crisp. The
-             app is fully interactive underneath, which is what makes it look
-             like a hang rather than a drawing fault.
-             Skia is the renderer this app was built and reviewed against, so
-             this costs nothing here. Revisit when Flutter's Impeller support
-             for these GPUs has settled. -->
-        <meta-data
-            android:name="io.flutter.embedding.android.EnableImpeller"
-            android:value="false" />
-
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
